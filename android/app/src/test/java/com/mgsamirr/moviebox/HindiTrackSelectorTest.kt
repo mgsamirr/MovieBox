@@ -33,6 +33,15 @@ class HindiTrackSelectorTest {
         assertNull(HindiTrackSelector.selectVerifiedHindiTrack(title))
     }
 
+    @Test fun recognizesHindiManifestLanguageTagsOnly() {
+        assertEquals(true, HindiTrackSelector.isHindiLanguage("hi"))
+        assertEquals(true, HindiTrackSelector.isHindiLanguage("hi-IN"))
+        assertEquals(true, HindiTrackSelector.isHindiLanguage("hin"))
+        assertEquals(false, HindiTrackSelector.isHindiLanguage("en-US"))
+        assertEquals(false, HindiTrackSelector.isHindiLanguage("und"))
+        assertEquals(false, HindiTrackSelector.isHindiLanguage(null))
+    }
+
     @Test fun rejectsUnauthorizedProviderMetadata() {
         val title = CatalogTitle(
             id = "movie",
