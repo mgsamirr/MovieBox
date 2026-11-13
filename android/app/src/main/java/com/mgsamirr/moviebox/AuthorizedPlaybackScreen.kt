@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +30,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.delay
 
 /**
  * Native Media3 playback surface. A provider must supply the media and license
@@ -37,11 +39,15 @@ import androidx.media3.ui.PlayerView
 @Composable
 fun AuthorizedPlaybackScreen(
     config: AuthorizedDrmPlaybackConfig,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onProgress: (ResumePoint) -> Unit = {},
+    onCompleted: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val result = remember(config) { AuthorizedDrmMediaItemFactory.create(config) }
     var playbackError by remember(config) { mutableStateOf<String?>(null) }
+    val currentOnProgress by rememberUpdatedState(onProgress)
+    val currentOnCompleted by rememberUpdatedState(onCompleted)
 
     val readyItem = (result as? DrmPlaybackResult.Ready)?.mediaItem
     val trackSelector = remember {
@@ -81,19 +87,43 @@ fun AuthorizedPlaybackScreen(
                 }
             }
 
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) currentOnCompleted(config.title.id)
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 playbackError = "Playback could not start. Check the provider stream, license access, and network."
             }
         }
         player?.addListener(listener)
         onDispose {
-            player?.removeListener(listener)
-            player?.release()
+            player?.let { activePlayer ->
+                val duration = activePlayer.duration
+                val position = activePlayer.currentPosition
+                if (activePlayer.playbackState != Player.STATE_ENDED && duration > 0L && position in 1 until duration) {
+                    currentOnProgress(
+                        ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
+                    )
+                }
+                activePlayer.removeListener(listener)
+                activePlayer.release()
+            }
         }
     }
 
     LaunchedEffect(player) {
-        player?.prepare()
+        val activePlayer = player ?: return@LaunchedEffect
+        activePlayer.prepare()
+        while (true) {
+            delay(10_000L)
+            val duration = activePlayer.duration
+            val position = activePlayer.currentPosition
+            if (activePlayer.isPlaying && duration > 0L && position in 1 until duration) {
+                currentOnProgress(
+                    ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
+                )
+            }
+        }
     }
 
     Column(
