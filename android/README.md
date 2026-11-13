@@ -1,23 +1,40 @@
-# Movie Box for Android
+# Movie Box — private Android app
 
-This is the native Android application shell for Movie Box. It is separate from the legacy Rust terminal UI.
+Movie Box is intended for personal installation and private use. It is not being prepared for public Play Store or Chrome Web Store distribution.
 
-## Current state
+## Included app behaviour
 
-- Native Kotlin + Jetpack Compose application module.
-- English navigation for Movies, Web Series, Anime, Search, Downloads and Settings.
-- A title is eligible only when an available audio track is explicitly identified as Hindi (language code hi, hin or hindi).
-- No Live TV, IPTV or live-stream section.
-- The catalog is intentionally empty until an authorized content provider is integrated. No sample titles or playback links are invented.
+- Native Android app using Kotlin and Jetpack Compose.
+- English interface with Movies, Web Series, Anime, Search, Downloads, Watchlist and Settings.
+- AMOLED-black visual theme.
+- Only titles with provider-confirmed, available and verified Hindi audio from an authorized source may enter the catalog.
+- No Live TV, IPTV, public streaming links, fake catalog entries, or unlicensed content.
+- Watchlist is stored locally on the device.
+- No account or sign-in is required by the current app shell.
+- No analytics, advertising SDK, crash-reporting SDK or third-party tracking SDK is included.
+- No storage, contacts, location, microphone, camera or notification permission is requested.
+- Android backup is disabled and cleartext HTTP traffic is blocked. HTTPS is required for any future provider connection.
 
-## Supplied decompiled ZIP
+## Private installation
 
-The supplied com.community.oneroom archive is a decompiled Android package, not a complete Gradle source project. Its manifest and resources show a OneRoom/Transsion app with movie, TV, anime, download and player screens, plus unrelated live, games, rewards, advertising and mini-app features.
+The debug APK is suitable for development/testing. For a personal long-term installation, create a private release APK and sign it with a keystore kept only on the owner's device or secure password manager. Never commit the keystore, passwords, API tokens or signing properties to GitHub.
 
-The archive is being treated as a permitted reference. The compiled DEX is not a drop-in source project. Reuse only independently reusable code/resources and appropriate UI concepts; do not transplant app-signature hooks, patching code, unrelated proprietary SDKs or services. MovieBox catalog and playback integration should come from the repository's licensed source or authorized provider APIs.
+After installing a signed release, keep the same keystore safe: Android requires the matching signing identity to update that installed app. If the keystore is lost, an update may require uninstalling the old app, which can erase local app data.
+
+The APK can be transferred privately to the owner's Android phone (for example, USB or a private file transfer) and installed after allowing that file source in Android settings. Do not share the APK publicly.
 
 ## Build
 
-Open this directory in Android Studio with JDK 17 and Android SDK 35 installed, then build the app debug variant.
+- JDK 17
+- Android SDK 35
+- Gradle 8.9
+- Debug: `gradle -p android testDebugUnitTest assembleDebug`
+- Release: `gradle -p android testReleaseUnitTest assembleRelease` (release signing must be configured locally before a signed distributable is produced).
 
-This starter is not yet connected to a catalog or playback provider and is not a release APK.
+## Catalog and playback status
+
+The catalog is deliberately empty until a legitimate content provider and its authorized API credentials are supplied/configured. The app does not invent movie names, Hindi audio availability, posters, or playback URLs. Playback and offline downloads are not advertised as working until a provider supports them.
+
+## Reference archive
+
+The supplied decompiled OneRoom package is treated only as an authorized design/behaviour reference. Unrelated ads, rewards, games, live streams, mini-apps, tracking integrations, signature hooks, patching code and proprietary SDKs are not part of this private app.
