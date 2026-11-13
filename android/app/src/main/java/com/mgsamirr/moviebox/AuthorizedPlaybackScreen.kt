@@ -50,6 +50,7 @@ fun AuthorizedPlaybackScreen(
     }
     val result = remember(config) { AuthorizedDrmMediaItemFactory.create(config) }
     var playbackError by remember(config) { mutableStateOf<String?>(null) }
+    var resumeApplied by remember(config.title.id) { mutableStateOf(false) }
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOnCompleted by rememberUpdatedState(onCompleted)
 
@@ -97,6 +98,14 @@ fun AuthorizedPlaybackScreen(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY && !resumeApplied) {
+                    val resumePoint = resumeStore.load().resumePoints[config.title.id]
+                    val duration = player?.duration ?: 0L
+                    if (resumePoint != null && duration > resumePoint.positionMs) {
+                        player?.seekTo(resumePoint.positionMs)
+                    }
+                    resumeApplied = true
+                }
                 if (playbackState == Player.STATE_ENDED) {
                     resumeStore.remove(config.title.id)
                     currentOnCompleted(config.title.id)
