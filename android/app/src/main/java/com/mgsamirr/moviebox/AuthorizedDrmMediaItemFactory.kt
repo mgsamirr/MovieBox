@@ -26,8 +26,8 @@ sealed interface DrmPlaybackResult {
 
 /**
  * Builds a Media3 MediaItem only when provider authorization and verified Hindi
- * audio are present. Media3 manages normal license acquisition/renewal against
- * the provider's license server during playback, subject to provider policy.
+ * audio are present. No background license-renewal or app auto-update task is
+ * configured by Movie Box; playback uses the provider's normal DRM session flow.
  */
 object AuthorizedDrmMediaItemFactory {
     fun create(config: AuthorizedDrmPlaybackConfig): DrmPlaybackResult {
