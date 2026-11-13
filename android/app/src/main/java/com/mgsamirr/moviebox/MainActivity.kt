@@ -218,7 +218,7 @@ private fun BrandHeader() {
                 .background(SurfaceColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text("S", color = Accent, fontWeight = FontWeight.Bold)
+            Text("MB", color = Accent, fontWeight = FontWeight.ExtraBold)
         }
     }
 }
