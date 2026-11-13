@@ -3,7 +3,10 @@ package com.mgsamirr.moviebox
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class AuthorizedDrmMediaItemFactoryTest {
     private fun title(authorized: Boolean = true, hindiVerified: Boolean = true) =
         CatalogTitle(
