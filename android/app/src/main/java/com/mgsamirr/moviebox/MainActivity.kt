@@ -497,7 +497,7 @@ private fun DownloadsScreen(
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Play a file from this device", fontWeight = FontWeight.Bold)
                     Text(
-                        "Choose a video using Android's file picker. Movie Box requests access only to the selected file and keeps audio disabled unless a Hindi language track is detected.",
+                        "Choose a video using Android's file picker. Movie Box requests access only to the selected file and does not enable playback unless a Hindi language track is detected.",
                         color = Muted,
                         style = MaterialTheme.typography.bodySmall
                     )
