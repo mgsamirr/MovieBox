@@ -13,7 +13,8 @@ class ContinueWatchingStore(
     private val preferences: SharedPreferences
 ) {
     fun load(): ContinueWatchingState {
-        val raw = preferences.getString(KEY_RESUME_POINTS, null) ?: return ContinueWatchingState.empty()
+        val raw = runCatching { preferences.getString(KEY_RESUME_POINTS, null) }
+            .getOrNull() ?: return ContinueWatchingState.empty()
         if (raw.length > MAX_JSON_CHARS) return ContinueWatchingState.empty()
 
         val points = runCatching {
