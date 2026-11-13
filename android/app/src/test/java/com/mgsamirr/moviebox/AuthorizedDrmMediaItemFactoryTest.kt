@@ -39,6 +39,12 @@ class AuthorizedDrmMediaItemFactoryTest {
         assertTrue(result is DrmPlaybackResult.Rejected)
     }
 
+    @Test fun rejectsHostlessOrCredentialedHttpsEndpoints() {
+        assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https:relative-path"))
+        assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https://user:password@media.example/movie.mpd"))
+        assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https://media.example/movie.mpd#fragment"))
+    }
+
     @Test fun acceptsAuthorizedWidevineConfiguration() {
         val result = AuthorizedDrmMediaItemFactory.create(
             AuthorizedDrmPlaybackConfig("https://media.example/movie.mpd", "https://license.example", title())
