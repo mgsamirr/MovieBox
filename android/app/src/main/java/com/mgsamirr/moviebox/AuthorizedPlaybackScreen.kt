@@ -2,7 +2,6 @@ package com.mgsamirr.moviebox
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,8 +24,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.AudioAttributes
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -76,31 +73,12 @@ fun AuthorizedPlaybackScreen(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onTracksChanged(tracks: Tracks) {
-                val hindiTrack = tracks.groups.asSequence()
-                    .filter { it.type == C.TRACK_TYPE_AUDIO }
-                    .flatMap { group ->
-                        (0 until group.length).asSequence()
-                            .filter { index ->
-                                group.isTrackSupported(index) &&
-                                    HindiTrackSelector.isHindiLanguage(group.getTrackFormat(index).language)
-                            }
-                            .map { index -> group to index }
-                    }
-                    .firstOrNull()
-
-                val parameters = trackSelector.buildUponParameters()
-                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, hindiTrack == null)
-                if (hindiTrack != null) {
-                    parameters.addOverride(
-                        TrackSelectionOverride(hindiTrack.first.mediaTrackGroup, listOf(hindiTrack.second))
-                    )
-                    playbackError = null
-                } else {
-                    playbackError = "Hindi audio is not present in this stream. Audio has been disabled."
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                playbackError = when (Media3HindiAudioPolicy.apply(trackSelector, tracks)) {
+                    true -> null
+                    false -> "Hindi audio is not present in this stream. Audio has been disabled."
+                    null -> null
                 }
-                trackSelector.setParameters(parameters)
             }
 
             override fun onPlayerError(error: PlaybackException) {
