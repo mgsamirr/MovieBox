@@ -1,5 +1,6 @@
 package com.mgsamirr.moviebox
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,9 @@ fun AuthorizedPlaybackScreen(
     onCompleted: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resumeStore = remember(context) {
+        ContinueWatchingStore(context.getSharedPreferences("movie_box_resume", Context.MODE_PRIVATE))
+    }
     val result = remember(config) { AuthorizedDrmMediaItemFactory.create(config) }
     var playbackError by remember(config) { mutableStateOf<String?>(null) }
     val currentOnProgress by rememberUpdatedState(onProgress)
@@ -93,7 +97,10 @@ fun AuthorizedPlaybackScreen(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) currentOnCompleted(config.title.id)
+                if (playbackState == Player.STATE_ENDED) {
+                    resumeStore.remove(config.title.id)
+                    currentOnCompleted(config.title.id)
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -106,9 +113,9 @@ fun AuthorizedPlaybackScreen(
                 val duration = activePlayer.duration
                 val position = activePlayer.currentPosition
                 if (activePlayer.playbackState != Player.STATE_ENDED && duration > 0L && position in 1 until duration) {
-                    currentOnProgress(
-                        ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
-                    )
+                    val point = ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
+                    resumeStore.record(point)
+                    currentOnProgress(point)
                 }
                 activePlayer.removeListener(listener)
                 activePlayer.release()
@@ -124,9 +131,9 @@ fun AuthorizedPlaybackScreen(
             val duration = activePlayer.duration
             val position = activePlayer.currentPosition
             if (activePlayer.isPlaying && duration > 0L && position in 1 until duration) {
-                currentOnProgress(
-                    ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
-                )
+                val point = ResumePoint(config.title.id, position, duration, System.currentTimeMillis())
+                resumeStore.record(point)
+                currentOnProgress(point)
             }
         }
     }
