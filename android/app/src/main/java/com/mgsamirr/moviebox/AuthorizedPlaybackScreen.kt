@@ -63,7 +63,7 @@ fun AuthorizedPlaybackScreen(
                 .build()
         }
     }
-    val player = remember(readyItem) {
+    val player = remember(config, readyItem) {
         readyItem?.let {
             ExoPlayer.Builder(context)
                 .setTrackSelector(trackSelector)
@@ -82,7 +82,7 @@ fun AuthorizedPlaybackScreen(
         }
     }
 
-    DisposableEffect(player) {
+    DisposableEffect(player, config.title.id) {
         val listener = object : Player.Listener {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 val hindiTrackState = Media3HindiAudioPolicy.apply(trackSelector, tracks)
@@ -123,7 +123,7 @@ fun AuthorizedPlaybackScreen(
         }
     }
 
-    LaunchedEffect(player) {
+    LaunchedEffect(player, config.title.id) {
         val activePlayer = player ?: return@LaunchedEffect
         activePlayer.prepare()
         while (true) {
