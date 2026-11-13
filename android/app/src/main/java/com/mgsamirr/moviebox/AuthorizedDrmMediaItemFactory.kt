@@ -59,6 +59,11 @@ object AuthorizedDrmMediaItemFactory {
 
     internal fun isHttps(value: String): Boolean =
         value.length <= 2048 &&
-            runCatching { URI(value).scheme.equals("https", ignoreCase = true) }
-                .getOrDefault(false)
+            runCatching {
+                val uri = URI(value)
+                uri.scheme.equals("https", ignoreCase = true) &&
+                    !uri.host.isNullOrBlank() &&
+                    uri.userInfo == null &&
+                    uri.fragment == null
+            }.getOrDefault(false)
 }
