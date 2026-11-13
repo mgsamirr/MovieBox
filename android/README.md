@@ -9,7 +9,8 @@ Movie Box is intended for personal installation and private use. It is not being
 - AMOLED-black visual theme.
 - Only titles with provider-confirmed, available and verified Hindi audio from an authorized source may enter the catalog.
 - No Live TV, IPTV, public streaming links, fake catalog entries, or unlicensed content.
-- Watchlist is stored locally on the device.
+- Watchlist is stored locally on the device; continue-watching positions use a separate, non-backed-up preferences file.
+- Users can open an individual local video through Android’s Storage Access Framework without granting broad storage permission. The local player selects a Hindi-tagged audio track and keeps audio disabled when no supported Hindi track is exposed.
 - No account or sign-in is required by the current app shell.
 - No analytics, advertising SDK, crash-reporting SDK or third-party tracking SDK is included.
 - No storage, contacts, location, microphone, camera or notification permission is requested.
@@ -33,11 +34,11 @@ The APK can be transferred privately to the owner's Android phone (for example, 
 
 ## DRM player integration
 
-The supplied archive contains AndroidX Media3 `1.7.1` DRM/player framework classes (`DefaultDrmSessionManager`, `DrmInitData`, Widevine support and offline-license helper APIs). Movie Box pins `androidx.media3:media3-exoplayer:1.7.1` to match that framework generation and uses Media3's supported DRM session configuration for authorized provider streams. The archive also contains other player forks; those are not mixed into the app because their package/API surface is different. No app-specific license URL, provider credentials, or offline-license entitlement is assumed. No automatic app updates or background DRM-license renewal jobs are configured. Protected offline downloads are not enabled until an authorized provider's offline-license contract is available.
+The supplied archive contains AndroidX Media3 `1.7.1` DRM/player framework classes (`DefaultDrmSessionManager`, `DrmInitData`, Widevine support and offline-license helper APIs). Movie Box uses Media3 `1.7.1` ExoPlayer, UI, DASH and HLS modules, plus the supported Widevine MediaItem configuration for authorized provider streams. The player inspects actual stream track metadata and disables audio unless it can select a Hindi-tagged track. No app-specific license URL, provider credentials, or offline-license entitlement is assumed. No automatic app updates or background DRM-license renewal jobs are configured. Protected offline downloads are not enabled until an authorized provider's offline-license contract is available.
 
 ## Catalog and playback status
 
-The catalog is deliberately empty until a legitimate content provider and its authorized API credentials are supplied/configured. The app does not invent movie names, Hindi audio availability, posters, or playback URLs. Playback and offline downloads are not advertised as working until a provider supports them.
+The online catalog is deliberately empty until a legitimate content provider and its authorized API credentials are supplied/configured. The app does not invent movie names, Hindi audio availability, posters, or playback URLs. The native player surface is implemented, but online DRM playback cannot be started until a provider supplies a compatible media URL, Widevine license endpoint and any required approved request metadata. Provider-backed offline downloads are not implemented. Local video playback is available separately through the Android file picker; Hindi audio is selected only when the file exposes a Hindi language tag.
 
 ## Reference archive
 
