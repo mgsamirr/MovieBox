@@ -322,7 +322,8 @@ private fun SearchScreen(
     onSearchChanged: (String) -> Unit,
     titles: List<CatalogTitle>,
     savedIds: Set<String>,
-    onToggleSaved: (String) -> Unit
+    onToggleSaved: (String) -> Unit,
+    onOpenTitle: (CatalogTitle) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
