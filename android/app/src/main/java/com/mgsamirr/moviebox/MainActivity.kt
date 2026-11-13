@@ -173,22 +173,13 @@ private fun BrandHeader() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                "MOVIE",
-                color = Accent,
-                fontWeight = FontWeight.Black,
-                style = MaterialTheme.typography.labelLarge,
-                letterSpacing = 3.sp
-            )
-            Text(
-                "BOX",
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                style = MaterialTheme.typography.titleLarge,
-                letterSpacing = 1.5.sp
-            )
-        }
+        Text(
+            "MOVIE BOX",
+            color = Color.White,
+            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.titleLarge,
+            letterSpacing = 1.5.sp
+        )
         Box(
             modifier = Modifier
                 .size(44.dp)
