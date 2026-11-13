@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.CancellationException
 
 private val AppBackground = Color(0xFF000000)
 private val SurfaceColor = Color(0xFF101010)
@@ -112,14 +113,16 @@ private fun MovieBoxApp() {
         preferences.edit().putStringSet("watchlist_ids", next.toSet()).apply()
     }
     LaunchedEffect(catalogSource) {
-        catalogState = if (catalogSource === EmptyCatalogSource) {
-            CatalogLoadState.ProviderNotConfigured
-        } else {
-            runCatching {
+        catalogState = try {
+            if (catalogSource === EmptyCatalogSource) {
+                CatalogLoadState.ProviderNotConfigured
+            } else {
                 CatalogLoadReducer.ready(CatalogRepository(catalogSource).getHindiReadyTitles())
-            }.getOrElse { error ->
-                CatalogLoadReducer.failed(error.message)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            CatalogLoadReducer.failed(error.message)
         }
     }
     val catalog = (catalogState as? CatalogLoadState.Ready)?.titles.orEmpty()
