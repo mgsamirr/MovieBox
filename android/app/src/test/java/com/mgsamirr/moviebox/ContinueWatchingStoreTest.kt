@@ -62,6 +62,23 @@ class ContinueWatchingStoreTest {
     }
 
     @Test
+    fun saveCapsResumeHistoryAtFiveHundredEntries() {
+        val points = (1..600).map { index ->
+            ResumePoint("movie-$index", 5L, 10L, index.toLong())
+        }
+        store.save(ContinueWatchingState.from(points))
+
+        assertEquals(500, store.load().resumePoints.size)
+    }
+
+    @Test
+    fun oversizedPayloadFailsClosed() {
+        preferences.edit().putString("resume_points_json", "x".repeat(512 * 1024 + 1)).commit()
+
+        assertTrue(store.load().resumePoints.isEmpty())
+    }
+
+    @Test
     fun resumeHistoryDoesNotWriteIntoWatchlistBackupPreferences() {
         val application = RuntimeEnvironment.getApplication<android.app.Application>()
         store.record(ResumePoint("movie-1", 5L, 10L, 1L))
