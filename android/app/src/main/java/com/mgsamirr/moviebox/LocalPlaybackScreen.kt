@@ -49,6 +49,7 @@ fun LocalPlaybackScreen(
             parameters = buildUponParameters()
                 .setPreferredAudioLanguage("hi")
                 .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
                 .build()
         }
     }
@@ -72,9 +73,11 @@ fun LocalPlaybackScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onTracksChanged(tracks: Tracks) {
-                playbackMessage = when (Media3HindiAudioPolicy.apply(trackSelector, tracks)) {
-                    true -> "Verified Hindi audio track selected."
-                    false -> "No supported Hindi audio track was found. Audio is disabled."
+                val hindiTrackState = Media3HindiAudioPolicy.apply(trackSelector, tracks)
+                if (hindiTrackState != true) player.pause()
+                playbackMessage = when (hindiTrackState) {
+                    true -> "Hindi audio track detected and selected."
+                    false -> "No supported Hindi audio track was found. Playback is disabled."
                     null -> "Checking the file's Hindi audio track…"
                 }
             }
