@@ -24,6 +24,19 @@ class CatalogTitleMetadataTest {
     }
 
     @Test
+    fun rejectsCredentialedOrHostlessPosterUrls() {
+        val base = CatalogTitle(
+            id = "movie-3",
+            name = "Example",
+            category = CatalogCategory.MOVIES,
+            audioTracks = emptyList()
+        )
+        assertNull(base.copy(posterUrl = "https://user:pass@cdn.example.org/poster.jpg").safePosterUrl)
+        assertNull(base.copy(posterUrl = "https:relative.jpg").safePosterUrl)
+        assertNull(base.copy(posterUrl = "https://cdn.example.org/poster.jpg#fragment").safePosterUrl)
+    }
+
+    @Test
     fun rejectsInvalidOrInsecureMetadata() {
         val title = CatalogTitle(
             id = "movie-2",
