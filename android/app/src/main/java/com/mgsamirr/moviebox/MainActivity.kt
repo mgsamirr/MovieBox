@@ -1,7 +1,11 @@
 package com.mgsamirr.moviebox
 
 import android.os.Bundle
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -83,7 +87,16 @@ private fun MovieBoxApp() {
     var selectedCategory by remember { mutableStateOf(CatalogCategory.MOVIES) }
     var search by remember { mutableStateOf("") }
     var openedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
+    var localVideoUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
+    val localVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            localVideoUri = uri
+        }
+    }
     val preferences = remember(context) { context.getSharedPreferences("movie_box", android.content.Context.MODE_PRIVATE) }
     var savedIds by remember {
         mutableStateOf(preferences.getStringSet("watchlist_ids", emptySet())?.toSet() ?: emptySet())
@@ -132,8 +145,11 @@ private fun MovieBoxApp() {
                     }
                 }
             ) { padding ->
+                val localVideo = localVideoUri
                 val detail = openedTitle
-                if (detail != null) {
+                if (localVideo != null) {
+                    LocalPlaybackScreen(uri = localVideo, onBack = { localVideoUri = null })
+                } else if (detail != null) {
                     CatalogDetailScreen(
                         title = detail,
                         onBack = { openedTitle = null },
@@ -164,10 +180,9 @@ private fun MovieBoxApp() {
                         onToggleSaved = ::toggleSaved,
                         onOpenTitle = { openedTitle = it }
                     )
-                    AppTab.DOWNLOADS -> EmptyStateScreen(
+                    AppTab.DOWNLOADS -> DownloadsScreen(
                         padding = padding,
-                        title = "Your downloads",
-                        message = "Downloaded titles will appear here when an authorized provider supports offline viewing."
+                        onOpenLocalVideo = { localVideoPicker.launch(arrayOf("video/*")) }
                     )
                     AppTab.WATCHLIST -> WatchlistScreen(padding, watchlistTitles, onToggleSaved = ::toggleSaved, onOpenTitle = { openedTitle = it })
                     AppTab.SETTINGS -> SettingsScreen(padding)
@@ -446,6 +461,50 @@ private fun EmptyStateScreen(padding: PaddingValues, title: String, message: Str
         item { BrandHeader() }
         item { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
         item { EmptyCollectionCard(title, message) }
+    }
+}
+
+@Composable
+private fun DownloadsScreen(
+    padding: PaddingValues,
+    onOpenLocalVideo: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        item { BrandHeader() }
+        item {
+            Text("Downloads", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Offline viewing", color = Muted)
+        }
+        item {
+            EmptyCollectionCard(
+                title = "No provider downloads yet.",
+                message = "Offline downloads will appear here when a connected licensed provider supports them."
+            )
+        }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Hairline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Play a file from this device", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Choose a video using Android's file picker. Movie Box requests access only to the selected file and keeps audio disabled unless a Hindi language track is detected.",
+                        color = Muted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(onClick = onOpenLocalVideo) {
+                        Text("CHOOSE LOCAL VIDEO", color = Accent)
+                    }
+                }
+            }
+        }
     }
 }
 
