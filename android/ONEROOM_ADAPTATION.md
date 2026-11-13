@@ -9,7 +9,8 @@ The supplied OneRoom archive is a decompiled Android package, not an editable An
 - A dedicated downloads destination, ready for a licensed provider's offline capability.
 - Account/settings destination and viewing preferences.
 - Dark-mode-first viewing surfaces and clear empty/loading states.
-- Video-detail and playback concepts are reserved for a future provider-backed implementation.
+- A native Media3 playback surface supports authorized Widevine streams once a provider supplies the media and license configuration.
+- A separate local-video player opens only a file explicitly selected through Android’s document picker.
 
 ## Deliberately not copied or enabled
 
@@ -28,4 +29,4 @@ No catalog is fabricated while a provider is absent. Provider credentials must n
 
 ## Current status
 
-The native Android shell includes Home, Search, Downloads, and Settings, plus Movies/Web Series/Anime categories and verified-Hindi filtering. The provider adapter boundary and playback eligibility checks are in place. A real catalog, detail metadata, artwork, playback, and offline downloads remain unavailable until a compatible licensed provider is configured.
+The native Android shell includes Home, Search, Downloads, Watchlist and Settings, plus Movies/Web Series/Anime categories and verified-Hindi filtering. Local file playback uses Media3 and disables audio unless a Hindi language track is exposed. The authorized Widevine player surface and continue-watching persistence are implemented, but the online catalog remains empty and online DRM playback/offline downloads remain unavailable until a compatible licensed provider is configured.
