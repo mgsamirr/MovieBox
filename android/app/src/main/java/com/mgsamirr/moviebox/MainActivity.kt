@@ -106,7 +106,7 @@ private fun MovieBoxApp() {
                 ) {
                     item {
                         Column {
-                            Text("MOVIEBOX", color = Accent, fontWeight = FontWeight.ExtraBold)
+                            Text("SHERIF MOVIE BOX", color = Accent, fontWeight = FontWeight.ExtraBold)
                             Spacer(Modifier.height(6.dp))
                             Text("Movies worth watching.", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                             Text("Discover movies, series and anime with Hindi audio.", color = Muted)
