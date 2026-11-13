@@ -29,4 +29,4 @@ No catalog is fabricated while a provider is absent. Provider credentials must n
 
 ## Current status
 
-The native Android shell includes Home, Search, Downloads, Watchlist and Settings, plus Movies/Web Series/Anime categories and verified-Hindi filtering. Local file playback uses Media3 and disables audio unless a Hindi language track is exposed. The authorized Widevine player surface and continue-watching persistence are implemented, but the online catalog remains empty and online DRM playback/offline downloads remain unavailable until a compatible licensed provider is configured.
+The native Android shell includes Home, Search, Downloads, Watchlist and Settings, plus Movies/Web Series/Anime categories and verified-Hindi filtering. Local file playback uses Media3 and keeps video and audio disabled until a Hindi language track is exposed. The authorized Widevine player surface and continue-watching persistence are implemented, but the online catalog remains empty and online DRM playback/offline downloads remain unavailable until a compatible licensed provider is configured.
