@@ -72,6 +72,13 @@ class ContinueWatchingStoreTest {
     }
 
     @Test
+    fun wrongPreferenceValueTypeFailsClosed() {
+        preferences.edit().putInt("resume_points_json", 42).commit()
+
+        assertTrue(store.load().resumePoints.isEmpty())
+    }
+
+    @Test
     fun oversizedPayloadFailsClosed() {
         preferences.edit().putString("resume_points_json", "x".repeat(512 * 1024 + 1)).commit()
 
