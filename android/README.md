@@ -10,7 +10,7 @@ Movie Box is intended for personal installation and private use. It is not being
 - Only titles with provider-confirmed, available and verified Hindi audio from an authorized source may enter the catalog.
 - No Live TV, IPTV, public streaming links, fake catalog entries, or unlicensed content.
 - Watchlist is stored locally on the device; continue-watching positions use a separate, non-backed-up preferences file.
-- Users can open an individual local video through Android’s Storage Access Framework without granting broad storage permission. The local player selects a Hindi-tagged audio track and keeps audio disabled when no supported Hindi track is exposed.
+- Users can open an individual local video through Android’s Storage Access Framework without granting broad storage permission. The local player enables playback only after a supported Hindi-tagged audio track is exposed; otherwise video and audio remain disabled.
 - No account or sign-in is required by the current app shell.
 - No analytics, advertising SDK, crash-reporting SDK or third-party tracking SDK is included.
 - No storage, contacts, location, microphone, camera or notification permission is requested.
