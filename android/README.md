@@ -13,7 +13,7 @@ Movie Box is intended for personal installation and private use. It is not being
 - No account or sign-in is required by the current app shell.
 - No analytics, advertising SDK, crash-reporting SDK or third-party tracking SDK is included.
 - No storage, contacts, location, microphone, camera or notification permission is requested.
-- Android backup is disabled and cleartext HTTP traffic is blocked. HTTPS is required for any future provider connection.
+- No automatic app updates or background DRM-license renewal jobs are configured. Cleartext HTTP traffic is blocked; HTTPS is required for any future provider connection.
 
 ## Private installation
 
