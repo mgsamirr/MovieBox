@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -48,6 +51,7 @@ fun AuthorizedPlaybackScreen(
         DefaultTrackSelector(context).apply {
             parameters = buildUponParameters()
                 .setPreferredAudioLanguage("hi")
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
                 .build()
         }
     }
@@ -57,6 +61,13 @@ fun AuthorizedPlaybackScreen(
                 .setTrackSelector(trackSelector)
                 .build()
                 .apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(C.USAGE_MEDIA)
+                            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                            .build(),
+                        true
+                    )
                     setMediaItem(it)
                     playWhenReady = false
                 }
@@ -65,6 +76,33 @@ fun AuthorizedPlaybackScreen(
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) {
+                val hindiTrack = tracks.groups.asSequence()
+                    .filter { it.type == C.TRACK_TYPE_AUDIO }
+                    .flatMap { group ->
+                        (0 until group.length).asSequence()
+                            .filter { index ->
+                                group.isTrackSupported(index) &&
+                                    HindiTrackSelector.isHindiLanguage(group.getTrackFormat(index).language)
+                            }
+                            .map { index -> group to index }
+                    }
+                    .firstOrNull()
+
+                val parameters = trackSelector.buildUponParameters()
+                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, hindiTrack == null)
+                if (hindiTrack != null) {
+                    parameters.addOverride(
+                        TrackSelectionOverride(hindiTrack.first.mediaTrackGroup, listOf(hindiTrack.second))
+                    )
+                    playbackError = null
+                } else {
+                    playbackError = "Hindi audio is not present in this stream. Audio has been disabled."
+                }
+                trackSelector.setParameters(parameters)
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 playbackError = "Playback could not start. Check the provider stream, license access, and network."
             }
