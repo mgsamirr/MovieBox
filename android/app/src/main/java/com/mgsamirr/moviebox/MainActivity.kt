@@ -411,7 +411,7 @@ private fun WatchlistScreen(
                 ) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).clickable { onOpenTitle(title) }) {
-                            Text(title.name, fontWeight = FontWeight.Bold
+                            Text(title.name, fontWeight = FontWeight.Bold)
                             Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
                         }
                         TextButton(onClick = { onToggleSaved(title.id) }) {
