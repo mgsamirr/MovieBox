@@ -411,7 +411,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(title.name, fontWeight = FontWeight.Bold)
                         Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
-                        TextButton(onClick = { onToggleSaved(title.id }) {
+                        TextButton(onClick = { onToggleSaved(title.id) }) {
                             Text(if (title.id in savedIds) "SAVED ✓" else "＋ WATCHLIST", color = Accent)
                         }
                     }
