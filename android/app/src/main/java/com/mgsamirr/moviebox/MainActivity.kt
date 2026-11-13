@@ -82,6 +82,7 @@ private fun MovieBoxApp() {
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
     var selectedCategory by remember { mutableStateOf(CatalogCategory.MOVIES) }
     var search by remember { mutableStateOf("") }
+    var openedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
     val context = LocalContext.current
     val preferences = remember(context) { context.getSharedPreferences("movie_box", android.content.Context.MODE_PRIVATE) }
     var savedIds by remember {
@@ -131,7 +132,15 @@ private fun MovieBoxApp() {
                     }
                 }
             ) { padding ->
-                when (selectedTab) {
+                val detail = openedTitle
+                if (detail != null) {
+                    CatalogDetailScreen(
+                        title = detail,
+                        onBack = { openedTitle = null },
+                        onToggleWatchlist = { toggleSaved(detail.id) },
+                        isSaved = detail.id in savedIds
+                    )
+                } else when (selectedTab) {
                     AppTab.HOME -> HomeScreen(
                         padding = padding,
                         selectedCategory = selectedCategory,
@@ -141,7 +150,8 @@ private fun MovieBoxApp() {
                         titles = visibleTitles,
                         onOpenSearch = { selectedTab = AppTab.SEARCH },
                         savedIds = savedIds,
-                        onToggleSaved = ::toggleSaved
+                        onToggleSaved = ::toggleSaved,
+                        onOpenTitle = { openedTitle = it }
                     )
                     AppTab.SEARCH -> SearchScreen(
                         padding = padding,
@@ -151,7 +161,8 @@ private fun MovieBoxApp() {
                         onSearchChanged = { search = it },
                         titles = visibleTitles,
                         savedIds = savedIds,
-                        onToggleSaved = ::toggleSaved
+                        onToggleSaved = ::toggleSaved,
+                        onOpenTitle = { openedTitle = it }
                     )
                     AppTab.DOWNLOADS -> EmptyStateScreen(
                         padding = padding,
@@ -253,7 +264,8 @@ private fun HomeScreen(
     titles: List<CatalogTitle>,
     onOpenSearch: () -> Unit,
     savedIds: Set<String>,
-    onToggleSaved: (String) -> Unit
+    onToggleSaved: (String) -> Unit,
+    onOpenTitle: (CatalogTitle) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -297,7 +309,7 @@ private fun HomeScreen(
         }
         item { CategoryChips(selectedCategory, onCategorySelected) }
         item { SectionHeading("Made for your screen") }
-        titleItems(titles, savedIds, onToggleSaved)
+        titleItems(titles, savedIds, onToggleSaved, onOpenTitle)
     }
 }
 
@@ -324,12 +336,15 @@ private fun SearchScreen(
         }
         item { SearchField(search, onSearchChanged) }
         item { CategoryChips(selectedCategory, onCategorySelected) }
-        titleItems(titles, savedIds, onToggleSaved)
+        titleItems(titles, savedIds, onToggleSaved, onOpenTitle)
     }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
-    titles: List<CatalogTitle>, savedIds: Set<String>, onToggleSaved: (String) -> Unit
+    titles: List<CatalogTitle>,
+    savedIds: Set<String>,
+    onToggleSaved: (String) -> Unit,
+    onOpenTitle: (CatalogTitle) -> Unit
 ) {
     if (titles.isEmpty()) {
         item {
@@ -343,7 +358,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
             Card(
                 colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                 shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clickable { onOpenTitle(title) },
                 border = BorderStroke(1.dp, Hairline)
             ) {
                 Column(Modifier.padding(18.dp)) {
