@@ -50,9 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 
 private val AppBackground = Color(0xFF000000)
 private val SurfaceColor = Color(0xFF101010)
@@ -221,6 +224,26 @@ private fun BrandHeader() {
 }
 
 @Composable
+private fun PosterThumbnail(title: CatalogTitle) {
+    val posterUrl = title.safePosterUrl
+    if (posterUrl != null) {
+        AsyncImage(
+            model = posterUrl,
+            contentDescription = title.name,
+            modifier = Modifier.size(72.dp, 104.dp).clip(RoundedCornerShape(12.dp)),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = Modifier.size(72.dp, 104.dp).background(ElevatedSurface, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("MB", color = Accent, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
 private fun SearchField(value: String, onValueChange: (String) -> Unit) {
     TextField(
         value = value,
@@ -379,15 +402,19 @@ private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
                 modifier = Modifier.fillMaxWidth().clickable { onOpenTitle(title) },
                 border = BorderStroke(1.dp, Hairline)
             ) {
-                Column(Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text(title.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onToggleSaved(title.id) }) {
+                Row(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    PosterThumbnail(title)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(title.name, fontWeight = FontWeight.Bold)
+                        Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
+                        TextButton(onClick = { onToggleSaved(title.id }) {
                             Text(if (title.id in savedIds) "SAVED ✓" else "＋ WATCHLIST", color = Accent)
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -426,8 +453,13 @@ private fun WatchlistScreen(
                     modifier = Modifier.fillMaxWidth().clickable { onOpenTitle(title) },
                     border = BorderStroke(1.dp, Hairline)
                 ) {
-                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f).clickable { onOpenTitle(title) }) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        PosterThumbnail(title)
+                        Column(Modifier.weight(1f).clickable { onOpenTitle(title) }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(title.name, fontWeight = FontWeight.Bold)
                             Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
                         }
