@@ -1,7 +1,6 @@
 package com.mgsamirr.moviebox
 
-import android.app.Application
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -16,7 +15,7 @@ class ContinueWatchingStoreTest {
 
     @Before
     fun setUp() {
-        val application = ApplicationProvider.getApplicationContext<Application>()
+        val application = RuntimeEnvironment.getApplication<android.app.Application>()
         preferences = application.getSharedPreferences("movie_box_resume_test", 0)
         preferences.edit().clear().commit()
         store = ContinueWatchingStore(preferences)
@@ -63,7 +62,10 @@ class ContinueWatchingStoreTest {
     }
 
     @Test
-    fun resumeHistoryUsesDedicatedPreferencesFile() {
-        assertEquals("movie_box_resume_test", preferences.toString().substringAfter("SharedPreferences ").substringBefore("@").takeIf { it == "movie_box_resume_test" } ?: "movie_box_resume_test")
+    fun resumeHistoryDoesNotWriteIntoWatchlistBackupPreferences() {
+        val application = RuntimeEnvironment.getApplication<android.app.Application>()
+        store.record(ResumePoint("movie-1", 5L, 10L, 1L))
+
+        assertEquals(null, application.getSharedPreferences("movie_box", 0).getString("resume_points_json", null))
     }
 }
