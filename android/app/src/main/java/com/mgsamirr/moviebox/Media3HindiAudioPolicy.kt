@@ -18,6 +18,7 @@ object Media3HindiAudioPolicy {
                 trackSelector.buildUponParameters()
                     .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
                     .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
             )
             return null
         }
@@ -35,6 +36,7 @@ object Media3HindiAudioPolicy {
         val parameters = trackSelector.buildUponParameters()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
             .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, hindiGroup == null)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, hindiGroup == null)
         if (hindiGroup != null) {
             parameters.addOverride(
                 TrackSelectionOverride(hindiGroup.first.mediaTrackGroup, hindiGroup.second)
