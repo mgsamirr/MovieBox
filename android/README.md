@@ -34,7 +34,7 @@ The APK can be transferred privately to the owner's Android phone (for example, 
 
 ## DRM player integration
 
-The supplied archive contains AndroidX Media3 `1.7.1` DRM/player framework classes (`DefaultDrmSessionManager`, `DrmInitData`, Widevine support and offline-license helper APIs). Movie Box uses Media3 `1.7.1` ExoPlayer, UI, DASH and HLS modules, plus the supported Widevine MediaItem configuration for authorized provider streams. The player inspects actual stream track metadata and disables audio unless it can select a Hindi-tagged track. No app-specific license URL, provider credentials, or offline-license entitlement is assumed. No automatic app updates or background DRM-license renewal jobs are configured. Protected offline downloads are not enabled until an authorized provider's offline-license contract is available.
+The supplied archive contains AndroidX Media3 `1.7.1` DRM/player framework classes (`DefaultDrmSessionManager`, `DrmInitData`, Widevine support and offline-license helper APIs). Movie Box uses Media3 `1.7.1` ExoPlayer, UI, DASH and HLS modules, plus the supported Widevine MediaItem configuration for authorized provider streams. The player inspects actual stream track metadata and keeps video and audio disabled unless it can select a supported Hindi-tagged track. No app-specific license URL, provider credentials, or offline-license entitlement is assumed. No automatic app updates or background DRM-license renewal jobs are configured. Protected offline downloads are not enabled until an authorized provider's offline-license contract is available.
 
 ## Catalog and playback status
 
