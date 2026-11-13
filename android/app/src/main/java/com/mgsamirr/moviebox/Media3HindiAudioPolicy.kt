@@ -22,26 +22,25 @@ object Media3HindiAudioPolicy {
             return null
         }
 
-        val hindiTrack = audioGroups.asSequence()
-            .flatMap { group ->
-                (0 until group.length).asSequence()
-                    .filter { index ->
-                        group.isTrackSupported(index) &&
-                            HindiTrackSelector.isHindiLanguage(group.getTrackFormat(index).language)
-                    }
-                    .map { index -> group to index }
+        val hindiGroup = audioGroups.asSequence()
+            .mapNotNull { group ->
+                val hindiIndices = (0 until group.length).filter { index ->
+                    group.isTrackSupported(index) &&
+                        HindiTrackSelector.isHindiLanguage(group.getTrackFormat(index).language)
+                }
+                if (hindiIndices.isEmpty()) null else group to hindiIndices
             }
             .firstOrNull()
 
         val parameters = trackSelector.buildUponParameters()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, hindiTrack == null)
-        if (hindiTrack != null) {
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, hindiGroup == null)
+        if (hindiGroup != null) {
             parameters.addOverride(
-                TrackSelectionOverride(hindiTrack.first.mediaTrackGroup, listOf(hindiTrack.second))
+                TrackSelectionOverride(hindiGroup.first.mediaTrackGroup, hindiGroup.second)
             )
         }
         trackSelector.setParameters(parameters)
-        return hindiTrack != null
+        return hindiGroup != null
     }
 }
