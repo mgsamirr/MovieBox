@@ -5,6 +5,8 @@
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
+        android:icon="@drawable/ic_movie_box"
+        android:roundIcon="@drawable/ic_movie_box"
         android:label="Movie Box"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
