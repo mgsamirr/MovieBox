@@ -51,16 +51,9 @@ data class CatalogTitle(
 }
 
 object HindiAudioPolicy {
-    private val hindiLanguageCodes = setOf("hi", "hin", "hindi")
-
     fun hasVerifiedHindiAudio(title: CatalogTitle): Boolean =
         title.fromAuthorizedProvider && title.audioTracks.any { track ->
-            val primaryLanguage = track.languageCode
-                .trim()
-                .lowercase()
-                .substringBefore('-')
-                .substringBefore('_')
-            track.available && track.verified && primaryLanguage in hindiLanguageCodes
+            track.available && track.verified && HindiTrackSelector.isHindiLanguage(track.languageCode)
         }
 
     fun filterVerifiedHindiTitles(titles: List<CatalogTitle>): List<CatalogTitle> =
