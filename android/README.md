@@ -31,6 +31,10 @@ The APK can be transferred privately to the owner's Android phone (for example, 
 - Debug: `gradle -p android testDebugUnitTest assembleDebug`
 - Release: `gradle -p android testReleaseUnitTest assembleRelease` (release signing must be configured locally before a signed distributable is produced).
 
+## DRM player integration
+
+The supplied archive contains AndroidX Media3 `1.7.1` DRM/player framework classes (`DefaultDrmSessionManager`, `DrmInitData`, Widevine support and offline-license helper APIs). Movie Box pins `androidx.media3:media3-exoplayer:1.7.1` to match that framework generation and uses Media3's supported DRM session configuration for authorized provider streams. The archive also contains other player forks; those are not mixed into the app because their package/API surface is different. No app-specific license URL, provider credentials, or offline-license entitlement is assumed. No automatic app updates or background DRM-license renewal jobs are configured. Protected offline downloads are not enabled until an authorized provider's offline-license contract is available.
+
 ## Catalog and playback status
 
 The catalog is deliberately empty until a legitimate content provider and its authorized API credentials are supplied/configured. The app does not invent movie names, Hindi audio availability, posters, or playback URLs. Playback and offline downloads are not advertised as working until a provider supports them.
