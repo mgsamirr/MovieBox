@@ -1,0 +1,59 @@
+name: Repair Hickory DNS dependency
+
+on:
+  push:
+    branches: [android-native-port]
+    paths:
+      - ".github/workflows/repair-hickory.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-hickory-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  upgrade-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: android-native-port
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.90.0"
+      - name: Upgrade Hickory resolver
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("Cargo.toml")
+          text = path.read_text()
+          old = 'hickory-resolver = { version = "0.25.2",'
+          new = 'hickory-resolver = { version = "0.26.3",'
+          if old not in text:
+              raise SystemExit("Expected hickory-resolver 0.25.2 declaration was not found; refusing to guess.")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          cargo update -p hickory-resolver --precise 0.26.3
+      - name: Compile all targets and features
+        run: cargo check --all-targets --all-features --locked
+      - name: Run test suite
+        run: cargo test --all-features --locked
+      - name: Commit validated dependency update
+        run: |
+          if git diff --quiet -- Cargo.toml Cargo.lock; then
+            echo "No dependency changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "fix: upgrade Hickory DNS resolver"
+          git push origin HEAD:android-native-port
+      - name: Audit dependencies
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit
