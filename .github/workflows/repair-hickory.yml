@@ -4,7 +4,7 @@ on:
   push:
     branches: [android-native-port]
     paths:
-      - ".github/workflows/repair-hickory.yml"
+      - ".github/workflows/repair-hickory.yml"\n      - "src/net.rs"\n      - "Cargo.toml"
 
 permissions:
   contents: write
