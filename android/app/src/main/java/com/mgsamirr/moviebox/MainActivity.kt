@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,8 +73,8 @@ private enum class AppTab(val label: String, val symbol: String) {
     SETTINGS("Settings", "⚙")
 }
 
-// Connect only a licensed catalog implementation. Empty by design until configured.
-private val catalog: List<CatalogTitle> = emptyList()
+// Replace only with a provider implementation the app owner is authorized to use.
+private val catalogSource: AuthorizedCatalogSource = EmptyCatalogSource
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,6 +92,7 @@ private fun MovieBoxApp() {
     var search by remember { mutableStateOf("") }
     var openedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
     var localVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var catalogState by remember { mutableStateOf<CatalogLoadState>(CatalogLoadState.Loading) }
     val context = LocalContext.current
     val localVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -109,13 +111,24 @@ private fun MovieBoxApp() {
         savedIds = next
         preferences.edit().putStringSet("watchlist_ids", next.toSet()).apply()
     }
-    val watchlistTitles = remember(savedIds) {
-        WatchlistState.fromIds(savedIds).filter(HindiAudioPolicy.filterVerifiedHindiTitles(catalog))
+    LaunchedEffect(catalogSource) {
+        catalogState = if (catalogSource === EmptyCatalogSource) {
+            CatalogLoadState.ProviderNotConfigured
+        } else {
+            runCatching {
+                CatalogLoadReducer.ready(CatalogRepository(catalogSource).getHindiReadyTitles())
+            }.getOrElse { error ->
+                CatalogLoadReducer.failed(error.message)
+            }
+        }
+    }
+    val catalog = (catalogState as? CatalogLoadState.Ready)?.titles.orEmpty()
+    val watchlistTitles = remember(savedIds, catalog) {
+        WatchlistState.fromIds(savedIds).filter(catalog)
     }
 
-    val visibleTitles = remember(selectedCategory, search) {
-        HindiAudioPolicy.filterVerifiedHindiTitles(catalog)
-            .filter { it.category == selectedCategory }
+    val visibleTitles = remember(selectedCategory, search, catalog) {
+        catalog.filter { it.category == selectedCategory }
             .filter { it.name.contains(search, ignoreCase = true) }
     }
 
