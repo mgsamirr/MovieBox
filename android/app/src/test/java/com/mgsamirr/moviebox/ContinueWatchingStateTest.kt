@@ -18,6 +18,8 @@ class ContinueWatchingStateTest {
         assertEquals(empty, empty.record(ResumePoint("movie", 0, 1000)))
         assertEquals(empty, empty.record(ResumePoint("movie", 1200, 1000)))
         assertEquals(empty, empty.record(ResumePoint("", 100, 1000)))
+        assertEquals(empty, empty.record(ResumePoint("x".repeat(257), 100, 1000)))
+        assertEquals(empty, empty.record(ResumePoint("movie", 100, 1000, -1)))
     }
 
     @Test fun onlyAuthorizedHindiTitlesAppear() {
@@ -30,6 +32,25 @@ class ContinueWatchingStateTest {
             state.eligibleTitles(listOf(title("allowed"), title("blocked", authorized = false)))
                 .map { it.id }
         )
+    }
+
+    @Test fun mostRecentlyUpdatedTitleAppearsFirst() {
+        val state = ContinueWatchingState.from(listOf(
+            ResumePoint("watched-longer", 800, 1000, updatedAtEpochMs = 100),
+            ResumePoint("watched-later", 200, 1000, updatedAtEpochMs = 200)
+        ))
+        assertEquals(
+            listOf("watched-later", "watched-longer"),
+            state.eligibleTitles(listOf(title("watched-longer"), title("watched-later")))
+                .map { it.id }
+        )
+    }
+
+    @Test fun newerRecordReplacesOlderProgressForSameTitle() {
+        val state = ContinueWatchingState.from(listOf(
+            ResumePoint("movie", 300, 1000, updatedAtEpochMs = 100)
+        )).record(ResumePoint("movie", 600, 1000, updatedAtEpochMs = 200))
+        assertEquals(600L, state.resumePoints.getValue("movie").positionMs)
     }
 
     @Test fun removeClearsResumePoint() {
