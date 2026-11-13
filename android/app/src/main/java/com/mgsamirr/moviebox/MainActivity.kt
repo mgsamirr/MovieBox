@@ -31,6 +31,7 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -59,6 +61,7 @@ private enum class AppTab(val label: String, val symbol: String) {
     HOME("Home", "⌂"),
     SEARCH("Search", "⌕"),
     DOWNLOADS("Downloads", "↓"),
+    WATCHLIST("Watchlist", "♡"),
     SETTINGS("Settings", "⚙")
 }
 
@@ -79,6 +82,19 @@ private fun SherifMovieBoxApp() {
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
     var selectedCategory by remember { mutableStateOf(CatalogCategory.MOVIES) }
     var search by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("sherif_movie_box", android.content.Context.MODE_PRIVATE) }
+    var savedIds by remember {
+        mutableStateOf(preferences.getStringSet("watchlist_ids", emptySet())?.toSet() ?: emptySet())
+    }
+    fun toggleSaved(titleId: String) {
+        val next = if (titleId in savedIds) savedIds - titleId else savedIds + titleId
+        savedIds = next
+        preferences.edit().putStringSet("watchlist_ids", next.toSet()).apply()
+    }
+    val watchlistTitles = remember(savedIds) {
+        WatchlistState.fromIds(savedIds).filter(HindiAudioPolicy.filterVerifiedHindiTitles(catalog))
+    }
 
     val visibleTitles = remember(selectedCategory, search) {
         HindiAudioPolicy.filterVerifiedHindiTitles(catalog)
@@ -123,7 +139,9 @@ private fun SherifMovieBoxApp() {
                         search = search,
                         onSearchChanged = { search = it },
                         titles = visibleTitles,
-                        onOpenSearch = { selectedTab = AppTab.SEARCH }
+                        onOpenSearch = { selectedTab = AppTab.SEARCH },
+                        savedIds = savedIds,
+                        onToggleSaved = ::toggleSaved
                     )
                     AppTab.SEARCH -> SearchScreen(
                         padding = padding,
@@ -131,13 +149,16 @@ private fun SherifMovieBoxApp() {
                         onCategorySelected = { selectedCategory = it },
                         search = search,
                         onSearchChanged = { search = it },
-                        titles = visibleTitles
+                        titles = visibleTitles,
+                        savedIds = savedIds,
+                        onToggleSaved = ::toggleSaved
                     )
                     AppTab.DOWNLOADS -> EmptyStateScreen(
                         padding = padding,
                         title = "Your downloads",
                         message = "Downloaded titles will appear here when an authorized provider supports offline viewing."
                     )
+                    AppTab.WATCHLIST -> WatchlistScreen(padding, watchlistTitles, onToggleSaved = ::toggleSaved)
                     AppTab.SETTINGS -> SettingsScreen(padding)
                 }
             }
@@ -239,7 +260,9 @@ private fun HomeScreen(
     search: String,
     onSearchChanged: (String) -> Unit,
     titles: List<CatalogTitle>,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    savedIds: Set<String>,
+    onToggleSaved: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -283,7 +306,7 @@ private fun HomeScreen(
         }
         item { CategoryChips(selectedCategory, onCategorySelected) }
         item { SectionHeading("Made for your screen") }
-        titleItems(titles)
+        titleItems(titles, savedIds, onToggleSaved)
     }
 }
 
@@ -294,7 +317,9 @@ private fun SearchScreen(
     onCategorySelected: (CatalogCategory) -> Unit,
     search: String,
     onSearchChanged: (String) -> Unit,
-    titles: List<CatalogTitle>
+    titles: List<CatalogTitle>,
+    savedIds: Set<String>,
+    onToggleSaved: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -308,11 +333,13 @@ private fun SearchScreen(
         }
         item { SearchField(search, onSearchChanged) }
         item { CategoryChips(selectedCategory, onCategorySelected) }
-        titleItems(titles)
+        titleItems(titles, savedIds, onToggleSaved)
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(titles: List<CatalogTitle>) {
+private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
+    titles: List<CatalogTitle>, savedIds: Set<String>, onToggleSaved: (String) -> Unit
+) {
     if (titles.isEmpty()) {
         item {
             EmptyCollectionCard(
@@ -329,9 +356,60 @@ private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(titles: Li
                 border = BorderStroke(1.dp, Hairline)
             ) {
                 Column(Modifier.padding(18.dp)) {
-                    Text(title.name, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text(title.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onToggleSaved(title.id) }) {
+                            Text(if (title.id in savedIds) "SAVED ✓" else "＋ WATCHLIST", color = Accent)
+                        }
+                    }
                     Spacer(Modifier.height(6.dp))
                     Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WatchlistScreen(
+    padding: PaddingValues,
+    titles: List<CatalogTitle>,
+    onToggleSaved: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        item { BrandHeader() }
+        item {
+            Text("My Watchlist", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("Your saved titles with verified Hindi audio.", color = Muted)
+        }
+        if (titles.isEmpty()) {
+            item {
+                EmptyCollectionCard(
+                    "Your watchlist is empty.",
+                    "Save a title using the Watchlist button. Only authorized titles with verified Hindi audio are kept here."
+                )
+            }
+        } else {
+            items(titles, key = { it.id }) { title ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceColor),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Hairline)
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(title.name, fontWeight = FontWeight.Bold)
+                            Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
+                        }
+                        TextButton(onClick = { onToggleSaved(title.id) }) {
+                            Text("REMOVE", color = Muted)
+                        }
+                    }
                 }
             }
         }
