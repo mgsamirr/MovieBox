@@ -169,7 +169,7 @@ private fun MovieBoxApp() {
                         title = "Your downloads",
                         message = "Downloaded titles will appear here when an authorized provider supports offline viewing."
                     )
-                    AppTab.WATCHLIST -> WatchlistScreen(padding, watchlistTitles, onToggleSaved = ::toggleSaved)
+                    AppTab.WATCHLIST -> WatchlistScreen(padding, watchlistTitles, onToggleSaved = ::toggleSaved, onOpenTitle = { openedTitle = it })
                     AppTab.SETTINGS -> SettingsScreen(padding)
                 }
             }
@@ -381,7 +381,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.titleItems(
 private fun WatchlistScreen(
     padding: PaddingValues,
     titles: List<CatalogTitle>,
-    onToggleSaved: (String) -> Unit
+    onToggleSaved: (String) -> Unit,
+    onOpenTitle: (CatalogTitle) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
@@ -405,12 +406,12 @@ private fun WatchlistScreen(
                 Card(
                     colors = CardDefaults.cardColors(containerColor = SurfaceColor),
                     shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenTitle(title) },
                     border = BorderStroke(1.dp, Hairline)
                 ) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(title.name, fontWeight = FontWeight.Bold)
+                        Column(Modifier.weight(1f).clickable { onOpenTitle(title) }) {
+                            Text(title.name, fontWeight = FontWeight.Bold
                             Text("HINDI AUDIO VERIFIED", color = Accent, style = MaterialTheme.typography.labelSmall)
                         }
                         TextButton(onClick = { onToggleSaved(title.id) }) {
