@@ -62,12 +62,6 @@ private enum class AppTab(val label: String, val symbol: String) {
     SETTINGS("Settings", "⚙")
 }
 
-private enum class CatalogCategory(val label: String) {
-    MOVIES("Movies"),
-    SERIES("Web Series"),
-    ANIME("Anime")
-}
-
 // Connect only a licensed catalog implementation. Empty by design until configured.
 private val catalog: List<CatalogTitle> = emptyList()
 
