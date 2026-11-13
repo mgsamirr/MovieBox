@@ -1,6 +1,7 @@
 package com.mgsamirr.moviebox
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,7 +41,7 @@ class AuthorizedDrmMediaItemFactoryTest {
     }
 
     @Test fun rejectsHostlessOrCredentialedHttpsEndpoints() {
-        assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https:relative-path"))
+        assertFalse(AuthorizedDrmMediaItemFactory.isHttps("https:relative-path"))
         assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https://user:password@media.example/movie.mpd"))
         assertTrue(!AuthorizedDrmMediaItemFactory.isHttps("https://media.example/movie.mpd#fragment"))
     }
