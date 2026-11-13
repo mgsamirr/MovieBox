@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{
-    CLOUDFLARE, GOOGLE, LookupIpStrategy, NameServerConfig, ResolverConfig, QUAD9,
+    CLOUDFLARE, GOOGLE, LookupIpStrategy, NameServerConfig, QUAD9, ResolverConfig,
 };
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
@@ -83,16 +83,17 @@ impl Resolve for FallbackResolver {
                         "primary DNS lookup for {} failed ({primary_err}); retrying with fallback public DNS",
                         name.as_str()
                     );
-                    let lookup = fallback
-                        .lookup_ip(name.as_str())
-                        .await
-                        .map_err(|fallback_err| {
-                            log::warn!(
-                                "fallback DNS lookup for {} also failed: {fallback_err}",
-                                name.as_str()
-                            );
-                            primary_err
-                        })?;
+                    let lookup =
+                        fallback
+                            .lookup_ip(name.as_str())
+                            .await
+                            .map_err(|fallback_err| {
+                                log::warn!(
+                                    "fallback DNS lookup for {} also failed: {fallback_err}",
+                                    name.as_str()
+                                );
+                                primary_err
+                            })?;
                     let addrs: Addrs = Box::new(
                         lookup
                             .into_iter()
