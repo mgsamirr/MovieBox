@@ -1,6 +1,7 @@
 package com.mgsamirr.moviebox
 
 import android.net.Uri
+import java.net.URI
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 
@@ -57,6 +58,7 @@ object AuthorizedDrmMediaItemFactory {
     }
 
     internal fun isHttps(value: String): Boolean =
-        runCatching { Uri.parse(value).scheme.equals("https", ignoreCase = true) }
-            .getOrDefault(false) && value.length <= 2048
+        value.length <= 2048 &&
+            runCatching { URI(value).scheme.equals("https", ignoreCase = true) }
+                .getOrDefault(false)
 }
