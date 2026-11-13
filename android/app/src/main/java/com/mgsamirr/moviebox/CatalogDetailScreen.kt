@@ -20,8 +20,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 
 @Composable
 fun CatalogDetailScreen(
@@ -51,6 +54,14 @@ fun CatalogDetailScreen(
                 border = BorderStroke(1.dp, Color(0xFF292929))
             ) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    title.safePosterUrl?.let { posterUrl ->
+                        AsyncImage(
+                            model = posterUrl,
+                            contentDescription = title.name,
+                            modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(18.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                     Text(title.category.label.uppercase(), color = accent, style = MaterialTheme.typography.labelMedium)
                     Text(title.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold)
                     val details = listOfNotNull(
