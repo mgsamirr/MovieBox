@@ -55,6 +55,7 @@ fun AuthorizedPlaybackScreen(
             parameters = buildUponParameters()
                 .setPreferredAudioLanguage("hi")
                 .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
                 .build()
         }
     }
@@ -80,7 +81,9 @@ fun AuthorizedPlaybackScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                playbackError = when (Media3HindiAudioPolicy.apply(trackSelector, tracks)) {
+                val hindiTrackState = Media3HindiAudioPolicy.apply(trackSelector, tracks)
+                if (hindiTrackState != true) player?.pause()
+                playbackError = when (hindiTrackState) {
                     true -> null
                     false -> "Hindi audio is not present in this stream. Audio has been disabled."
                     null -> null
