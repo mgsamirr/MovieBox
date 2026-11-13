@@ -1,6 +1,6 @@
-# MovieBox Android
+# Sherif Movie Box for Android
 
-This is the first native Android application shell for MovieBox, separate from the existing Rust terminal UI.
+This is the native Android application shell for Sherif Movie Box. It is separate from the legacy Rust terminal UI.
 
 ## Current state
 
