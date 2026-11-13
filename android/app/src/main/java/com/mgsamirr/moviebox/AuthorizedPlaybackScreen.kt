@@ -85,8 +85,10 @@ fun AuthorizedPlaybackScreen(
                 if (hindiTrackState != true) player?.pause()
                 playbackError = when (hindiTrackState) {
                     true -> null
-                    false -> "Hindi audio is not present in this stream. Audio has been disabled."
-                    null -> null
+                    false -> "Hindi audio is not present in this stream. Playback is disabled."
+                    null -> if (player?.playbackState == Player.STATE_READY) {
+                        "No Hindi audio track metadata was exposed. Playback is disabled."
+                    } else null
                 }
             }
 
