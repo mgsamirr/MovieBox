@@ -121,6 +121,7 @@ private fun MovieBoxApp() {
             Scaffold(
                 containerColor = AppBackground,
                 bottomBar = {
+                    if (openedTitle == null && localVideoUri == null) {
                     NavigationBar(containerColor = Color(0xFF080808), contentColor = Muted) {
                         AppTab.entries.forEach { tab ->
                             NavigationBarItem(
@@ -142,6 +143,7 @@ private fun MovieBoxApp() {
                                 }
                             )
                         }
+                    }
                     }
                 }
             ) { padding ->
