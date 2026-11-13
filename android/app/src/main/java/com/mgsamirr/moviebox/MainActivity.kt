@@ -73,17 +73,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.BLACK
         window.navigationBarColor = android.graphics.Color.BLACK
-        setContent { SherifMovieBoxApp() }
+        setContent { MovieBoxApp() }
     }
 }
 
 @Composable
-private fun SherifMovieBoxApp() {
+private fun MovieBoxApp() {
     var selectedTab by remember { mutableStateOf(AppTab.HOME) }
     var selectedCategory by remember { mutableStateOf(CatalogCategory.MOVIES) }
     var search by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val preferences = remember(context) { context.getSharedPreferences("sherif_movie_box", android.content.Context.MODE_PRIVATE) }
+    val preferences = remember(context) { context.getSharedPreferences("movie_box", android.content.Context.MODE_PRIVATE) }
     var savedIds by remember {
         mutableStateOf(preferences.getStringSet("watchlist_ids", emptySet())?.toSet() ?: emptySet())
     }
@@ -175,14 +175,14 @@ private fun BrandHeader() {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                "SHERIF",
+                "MOVIE",
                 color = Accent,
                 fontWeight = FontWeight.Black,
                 style = MaterialTheme.typography.labelLarge,
                 letterSpacing = 3.sp
             )
             Text(
-                "MOVIE BOX",
+                "BOX",
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
                 style = MaterialTheme.typography.titleLarge,
@@ -470,7 +470,7 @@ private fun SettingsScreen(padding: PaddingValues) {
         item {
             SettingsRow(
                 title = "Live TV and IPTV",
-                description = "Not included in Sherif Movie Box.",
+                description = "Not included in Movie Box.",
                 checked = false,
                 showSwitch = false
             )
