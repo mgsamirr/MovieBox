@@ -48,7 +48,6 @@ fun AuthorizedPlaybackScreen(
         DefaultTrackSelector(context).apply {
             parameters = buildUponParameters()
                 .setPreferredAudioLanguage("hi")
-                .setSelectUndeterminedAudioLanguage(false)
                 .build()
         }
     }
