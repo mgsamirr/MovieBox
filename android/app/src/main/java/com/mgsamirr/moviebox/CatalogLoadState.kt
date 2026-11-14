@@ -15,9 +15,10 @@ object CatalogLoadReducer {
     fun ready(titles: List<CatalogTitle>): CatalogLoadState =
         CatalogLoadState.Ready(HindiAudioPolicy.filterVerifiedHindiTitles(titles))
 
-    fun failed(message: String?): CatalogLoadState =
-        CatalogLoadState.Failed(
-            message?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
-                ?: "The catalog could not be loaded. Please try again."
-        )
+    /**
+     * Do not surface exception messages: HTTP/client exceptions can contain
+     * signed URLs, query tokens, or provider response fragments.
+     */
+    fun failed(@Suppress("UNUSED_PARAMETER") message: String?): CatalogLoadState =
+        CatalogLoadState.Failed("The catalog could not be loaded. Please try again.")
 }
