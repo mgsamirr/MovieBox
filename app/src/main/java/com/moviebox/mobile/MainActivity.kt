@@ -66,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -303,7 +304,7 @@ private fun HomeScreen(
             }
         }
         if (recent.isNotEmpty()) {
-            item { Text("Continue watching", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            item { Text("Recently watched", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
             items(recent.take(5), key = { "recent-${it.title.id}" }) { TitleCard(it.title, onSelect) }
         }
         item { Text("Recently added", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
@@ -365,7 +366,11 @@ private fun TitleCard(item: CatalogTitle, onSelect: (CatalogTitle) -> Unit) {
     ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).background(Color(0xFF211A32), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Movie, contentDescription = null, tint = Accent, modifier = Modifier.size(28.dp))
+                if (item.posterUrl.startsWith("https://")) {
+                    AsyncImage(model = item.posterUrl, contentDescription = "${item.title} poster", modifier = Modifier.fillMaxSize())
+                } else {
+                    Icon(Icons.Default.Movie, contentDescription = null, tint = Accent, modifier = Modifier.size(28.dp))
+                }
             }
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(item.title, color = White, fontWeight = FontWeight.SemiBold)
