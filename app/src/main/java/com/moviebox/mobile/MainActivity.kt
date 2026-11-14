@@ -95,7 +95,6 @@ import com.moviebox.mobile.data.VodMedia
 import com.moviebox.mobile.data.WatchHistoryStore
 import com.moviebox.mobile.data.RecentTitle
 import kotlinx.coroutines.delay
-import java.util.UUID
 
 private val Black = Color(0xFF000000)
 private val Panel = Color(0xFF111116)
@@ -141,8 +140,6 @@ private fun MovieBoxApp() {
     var category by remember { mutableStateOf<ContentCategory?>(null) }
     var selectedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
     var managingEpisodesFor by remember { mutableStateOf<CatalogTitle?>(null) }
-    var editingTitle by remember { mutableStateOf<CatalogTitle?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
     var playerMedia by remember { mutableStateOf<VodMedia?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
 
@@ -224,7 +221,6 @@ private fun MovieBoxApp() {
                                     titles = titles,
                                     recent = recent,
                                     showRecentlyWatched = showRecentlyWatched,
-                                    onAdd = { editingTitle = null; showEditor = true },
                                     onSelect = { selectedTitle = it },
                                     onCategory = { category = it; tab = AppTab.SEARCH },
                                     onOpenLocal = { localPicker.launch(arrayOf("video/*")) }
@@ -235,7 +231,6 @@ private fun MovieBoxApp() {
                                     onQuery = { query = it },
                                     category = category,
                                     onCategory = { category = it },
-                                    onAdd = { editingTitle = null; showEditor = true },
                                     onSelect = { selectedTitle = it }
                                 )
                                 AppTab.WATCHLIST -> TitleListScreen(
@@ -253,7 +248,6 @@ private fun MovieBoxApp() {
                                 )
                                 AppTab.SETTINGS -> SettingsScreen(
                                     onOpenLocal = { localPicker.launch(arrayOf("video/*")) },
-                                    onAdd = { editingTitle = null; showEditor = true },
                                     pinEnabled = parentalPinEnabled,
                                     onSetOrChangePin = {
                                         pinInput = ""
@@ -344,19 +338,6 @@ private fun MovieBoxApp() {
         )
     }
 
-    if (showEditor) {
-        TitleEditorDialog(
-            initial = editingTitle,
-            onDismiss = { showEditor = false },
-            onSave = { item ->
-                catalog.save(item)
-                reload()
-                showEditor = false
-                notice = "Title saved to your MovieBox library."
-            }
-        )
-    }
-
     selectedTitle?.let { item ->
         TitleDetailsDialog(
             item = item,
@@ -384,14 +365,7 @@ private fun MovieBoxApp() {
                 reload()
                 selectedTitle = catalog.all().firstOrNull { it.id == item.id }
             },
-            onEdit = { editingTitle = item; selectedTitle = null; showEditor = true },
             onManageEpisodes = { managingEpisodesFor = item; selectedTitle = null },
-            onDelete = {
-                catalog.delete(item.id)
-                reload()
-                selectedTitle = null
-                notice = "Title removed from your library."
-            }
         )
     }
 
@@ -420,7 +394,6 @@ private fun HomeScreen(
     titles: List<CatalogTitle>,
     recent: List<RecentTitle>,
     showRecentlyWatched: Boolean,
-    onAdd: () -> Unit,
     onSelect: (CatalogTitle) -> Unit,
     onCategory: (ContentCategory) -> Unit,
     onOpenLocal: () -> Unit
@@ -432,7 +405,6 @@ private fun HomeScreen(
                     Text("YOUR ENTERTAINMENT SPACE", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                     Text("Find your next story.", color = White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                     Text("Hindi-dubbed movies, anime and web series in one place.", color = Muted, fontSize = 13.sp)
-                    Button(onClick = onAdd) { Text("＋ Add a title") }
                 }
             }
         }
@@ -466,7 +438,6 @@ private fun SearchScreen(
     onQuery: (String) -> Unit,
     category: ContentCategory?,
     onCategory: (ContentCategory?) -> Unit,
-    onAdd: () -> Unit,
     onSelect: (CatalogTitle) -> Unit
 ) {
     val filtered = titles.filter {
@@ -482,7 +453,6 @@ private fun SearchScreen(
         }
         if (filtered.isEmpty()) {
             EmptyState("No matching titles", "Add a provider-authorized title to start building your catalogue.")
-            Button(onClick = onAdd) { Text("Add title") }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(filtered, key = { it.id }) { TitleCard(it, onSelect) } }
         }
@@ -531,9 +501,7 @@ private fun TitleDetailsDialog(
     onPlay: () -> Unit,
     onDownload: () -> Unit,
     onWatchlist: () -> Unit,
-    onEdit: () -> Unit,
-    onManageEpisodes: () -> Unit,
-    onDelete: () -> Unit
+    onManageEpisodes: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -552,63 +520,10 @@ private fun TitleDetailsDialog(
                 Button(onClick = onPlay, enabled = item.playbackUrl.isNotBlank()) { Text("Play online") }
                 TextButton(onClick = onDownload, enabled = item.downloadUrl.isNotBlank()) { Text("Download offline") }
                 TextButton(onClick = onWatchlist) { Text(if (item.isWatchlisted) "Remove from saved" else "Add to watchlist") }
-                if (item.category != ContentCategory.MOVIE) TextButton(onClick = onManageEpisodes) { Text("Manage seasons & episodes") }
-                TextButton(onClick = onEdit) { Text("Edit title") }
-                TextButton(onClick = onDelete) { Text("Remove title") }
+                if (item.category != ContentCategory.MOVIE) TextButton(onClick = onManageEpisodes) { Text("View seasons & episodes") }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
-    )
-}
-
-@Composable
-private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onSave: (CatalogTitle) -> Unit) {
-    var title by remember(initial?.id) { mutableStateOf(initial?.title.orEmpty()) }
-    var category by remember(initial?.id) { mutableStateOf(initial?.category ?: ContentCategory.MOVIE) }
-    var language by remember(initial?.id) { mutableStateOf(initial?.language ?: "Hindi Dubbed") }
-    var synopsis by remember(initial?.id) { mutableStateOf(initial?.synopsis.orEmpty()) }
-    var genre by remember(initial?.id) { mutableStateOf(initial?.genre.orEmpty()) }
-    var releaseYear by remember(initial?.id) { mutableStateOf(initial?.releaseYear.orEmpty()) }
-    var posterUrl by remember(initial?.id) { mutableStateOf(initial?.posterUrl.orEmpty()) }
-    var playback by remember(initial?.id) { mutableStateOf(initial?.playbackUrl.orEmpty()) }
-    var download by remember(initial?.id) { mutableStateOf(initial?.downloadUrl.orEmpty()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Panel,
-        title = { Text(if (initial == null) "Add MovieBox title" else "Edit title", color = White) },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(500.dp)) {
-                item { OutlinedTextField(title, { title = it }, label = { Text("Movie / series / anime name") }, singleLine = true) }
-                item { Text("Category", color = Muted) }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ContentCategory.entries.forEach { c -> FilterChip(selected = category == c, onClick = { category = c }, label = { Text(c.label, fontSize = 10.sp) }) }
-                    }
-                }
-                item { OutlinedTextField(language, { language = it }, label = { Text("Audio language") }, singleLine = true) }
-                item { OutlinedTextField(genre, { genre = it }, label = { Text("Genres (e.g. Action, Comedy)") }, singleLine = true) }
-                item { OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, singleLine = true) }
-                item { OutlinedTextField(posterUrl, { posterUrl = it }, label = { Text("Poster image HTTPS URL (optional)") }, singleLine = true) }
-                item { OutlinedTextField(synopsis, { synopsis = it }, label = { Text("Description") }, minLines = 2) }
-                item { OutlinedTextField(playback, { playback = it }, label = { Text("Authorized HTTPS playback URL") }, singleLine = true) }
-                item { OutlinedTextField(download, { download = it }, label = { Text("Authorized HTTPS download URL") }, singleLine = true) }
-                item { Text("Only add links supplied by a provider that authorizes playback or downloading.", color = Muted, fontSize = 11.sp) }
-                error?.let { item { Text(it, color = Color(0xFFFF7777), fontSize = 12.sp) } }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                when {
-                    title.isBlank() -> error = "Please enter a title."
-                    (playback.isNotBlank() && !playback.startsWith("https://")) -> error = "Playback link must use HTTPS."
-                    (download.isNotBlank() && !download.startsWith("https://")) -> error = "Download link must use HTTPS."
-                    (posterUrl.isNotBlank() && !posterUrl.startsWith("https://")) -> error = "Poster URL must use HTTPS."
-                    else -> onSave(CatalogTitle(initial?.id ?: UUID.randomUUID().toString(), title.trim(), category, language.trim().ifBlank { "Hindi Dubbed" }, synopsis.trim(), playback.trim(), download.trim(), initial?.isWatchlisted ?: false, genre.trim(), releaseYear.trim(), posterUrl.trim()))
-                }
-            }) { Text("Save title") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
@@ -653,7 +568,6 @@ private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRe
 @Composable
 private fun SettingsScreen(
     onOpenLocal: () -> Unit,
-    onAdd: () -> Unit,
     pinEnabled: Boolean,
     onSetOrChangePin: () -> Unit,
     onDisablePin: () -> Unit,
@@ -707,7 +621,6 @@ private fun SettingsScreen(
                 }
             }
         }
-        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add a catalogue title") }
         OutlinedButton(onClick = onOpenLocal, modifier = Modifier.fillMaxWidth()) { Text("Open local video") }
         Text("No Live TV, IPTV, M3U, browser or WebView features.", color = Muted, fontSize = 12.sp)
     }
