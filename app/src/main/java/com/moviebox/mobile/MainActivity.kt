@@ -67,7 +67,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.moviebox.mobile.data.CatalogStore
@@ -573,13 +577,22 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
             playWhenReady = true
         }
     }
+    var availableTracks by remember(player) { mutableStateOf(player.currentTracks) }
+    var trackPickerType by remember { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onTracksChanged(tracks: Tracks) { availableTracks = tracks }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
     LaunchedEffect(player, media.id) {
         while (true) {
             delay(5_000)
             if (player.isPlaying && player.currentPosition > 0L) {
                 progressStore.save(media.id, player.currentPosition)
             }
-            if (player.playbackState == androidx.media3.common.Player.STATE_ENDED) {
+            if (player.playbackState == Player.STATE_ENDED) {
                 progressStore.clear(media.id)
                 break
             }
@@ -587,7 +600,7 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
     }
     androidx.compose.runtime.DisposableEffect(player, media.id) {
         onDispose {
-            if (player.currentPosition > 0L && player.playbackState != androidx.media3.common.Player.STATE_ENDED) {
+            if (player.currentPosition > 0L && player.playbackState != Player.STATE_ENDED) {
                 progressStore.save(media.id, player.currentPosition)
             }
             player.release()
@@ -595,6 +608,75 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
     }
     Column(Modifier.fillMaxSize().background(Black)) {
         Text("←  Back to MovieBox", color = White, modifier = Modifier.clickable(onClick = onClose).padding(16.dp))
-        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().weight(1f))
+        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().weight(1f))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_AUDIO }, modifier = Modifier.weight(1f)) { Text("Audio track") }
+            OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_TEXT }, modifier = Modifier.weight(1f)) { Text("Subtitles") }
+        }
     }
+    trackPickerType?.let { type ->
+        TrackPickerDialog(
+            tracks = availableTracks,
+            player = player,
+            trackType = type,
+            onDismiss = { trackPickerType = null }
+        )
+    }
+}
+
+@Composable
+private fun TrackPickerDialog(
+    tracks: Tracks,
+    player: ExoPlayer,
+    trackType: Int,
+    onDismiss: () -> Unit
+) {
+    val isSubtitle = trackType == C.TRACK_TYPE_TEXT
+    val groups = tracks.groups.filter { it.type == trackType && it.isSupported }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Panel,
+        title = { Text(if (isSubtitle) "Subtitle track" else "Audio track", color = White) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (isSubtitle) {
+                    TextButton(onClick = {
+                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                            .clearOverridesOfType(trackType)
+                            .setTrackTypeDisabled(trackType, true)
+                            .build()
+                        onDismiss()
+                    }) { Text("Off  •  No subtitles") }
+                }
+                if (groups.isEmpty()) {
+                    Text(if (isSubtitle) "No supported subtitle tracks in this video." else "No supported alternate audio tracks in this video.", color = Muted)
+                } else {
+                    groups.forEach { group ->
+                        for (index in 0 until group.length) {
+                            if (group.isTrackSupported(index)) {
+                                val format = group.getTrackFormat(index)
+                                val language = format.language?.takeIf { it.isNotBlank() && it != "und" }
+                                val label = format.label?.takeIf { it.isNotBlank() }
+                                    ?: language
+                                    ?: format.codecs?.takeIf { it.isNotBlank() }
+                                    ?: "Track ${index + 1}"
+                                val selected = group.isTrackSelected(index)
+                                TextButton(onClick = {
+                                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                                        .clearOverridesOfType(trackType)
+                                        .setTrackTypeDisabled(trackType, false)
+                                        .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                                        .build()
+                                    onDismiss()
+                                }) {
+                                    Text((if (selected) "✓  " else "") + label + (if (language != null && format.label != null) " • $language" else ""), color = if (selected) Accent else White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
 }
