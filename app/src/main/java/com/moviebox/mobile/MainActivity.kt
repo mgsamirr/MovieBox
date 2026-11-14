@@ -77,7 +77,7 @@ private fun MovieBoxApp() {
     MaterialTheme {
         Surface(color = AmoledBlack, modifier = Modifier.fillMaxSize()) {
             if (localVideo != null) {
-                LocalOnlyPlayer(uri = localVideo!!, onClose = { localVideo = null })
+                VodPlayer(uri = localVideo!!, isOnline = false, onClose = { localVideo = null })
             } else {
                 Scaffold(
                     containerColor = AmoledBlack,
@@ -111,7 +111,7 @@ private fun MovieBoxApp() {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("MOVIEBOX", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-                                Text("Your offline movie library", color = Muted, fontSize = 12.sp)
+                                Text("Stream online • Download • Watch offline", color = Muted, fontSize = 12.sp)
                             }
                             Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White, modifier = Modifier.size(26.dp))
                         }
@@ -141,13 +141,13 @@ private fun HomeScreen(onOpenLocal: () -> Unit) {
             contentAlignment = Alignment.BottomStart
         ) {
             Column {
-                Text("WATCH OFFLINE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("WATCH YOUR WAY", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("Download first.\nEnjoy anywhere.", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
+                Text("Stream it now.\nDownload for later.", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
             }
         }
         Text("Your library", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text("Only completed downloads and files saved on your phone can be played here.", color = Muted, fontSize = 13.sp)
+        Text("Play available movies and episodes online, or download them to watch offline.", color = Muted, fontSize = 13.sp)
         OpenFileCard(onClick = onOpenLocal)
     }
 }
@@ -192,17 +192,17 @@ private fun OpenFileCard(onClick: () -> Unit) {
 private fun EmptyCategory(name: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(name, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-        Text("The authorised download catalogue will be connected here.", color = Muted, fontSize = 13.sp)
-        Text("No online playback is available in MovieBox.", color = Accent, fontSize = 12.sp)
+        Text("Choose an available title to stream online or download for offline viewing.", color = Muted, fontSize = 13.sp)
+        Text("On-demand movies and episodes only. No Live TV or live channels.", color = Accent, fontSize = 12.sp)
     }
 }
 
 @Composable
-private fun LocalOnlyPlayer(uri: Uri, onClose: () -> Unit) {
+private fun VodPlayer(uri: Uri, isOnline: Boolean, onClose: () -> Unit) {
     val context = LocalContext.current
     val player = remember(uri) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(uri))
+            setMediaItem(MediaItem.Builder().setUri(uri).setMediaId(if (isOnline) "online-vod" else "downloaded-vod").build())
             prepare()
             playWhenReady = true
         }
