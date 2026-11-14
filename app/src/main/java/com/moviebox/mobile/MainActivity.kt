@@ -213,6 +213,7 @@ private fun MovieBoxApp() {
                                     records = queue,
                                     repository = downloads,
                                     onRefresh = { reload() },
+                                    onPlayDownloaded = { uri -> playerMedia = VodMedia("download-${uri.lastPathSegment}", "Offline download", uri, PlaybackSourceType.DOWNLOADED_FILE) },
                                     onOpenLocal = { localPicker.launch(arrayOf("video/*")) }
                                 )
                                 AppTab.SETTINGS -> SettingsScreen(onOpenLocal = { localPicker.launch(arrayOf("video/*")) }, onAdd = { editingTitle = null; showEditor = true })
@@ -470,10 +471,13 @@ private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onS
 }
 
 @Composable
-private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRepository, onRefresh: () -> Unit, onOpenLocal: () -> Unit) {
+private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRepository, onRefresh: () -> Unit, onPlayDownloaded: (Uri) -> Unit, onOpenLocal: () -> Unit) {
     var statuses by remember { mutableStateOf<Map<Long, DownloadStatus?>>(emptyMap()) }
-    LaunchedEffect(records, records.size) {
-        statuses = records.associate { it.id to repository.status(it.id) }
+    LaunchedEffect(records) {
+        while (true) {
+            statuses = records.associate { it.id to repository.status(it.id) }
+            delay(1500)
+        }
     }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Downloads", color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
@@ -492,6 +496,9 @@ private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRe
                             Text("${(progress * 100).toInt()}% downloaded", color = Muted, fontSize = 11.sp)
                         }
                         Text(record.fileName, color = Muted, fontSize = 10.sp)
+                        if (status?.status == DownloadManager.STATUS_SUCCESSFUL) {
+                            TextButton(onClick = { repository.downloadedUri(record.id)?.let(onPlayDownloaded) }) { Text("Play offline") }
+                        }
                         TextButton(onClick = { repository.remove(record.id); onRefresh() }) { Text("Remove download") }
                     }
                 }
