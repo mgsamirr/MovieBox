@@ -1,6 +1,7 @@
 package com.moviebox.mobile
 
 import android.net.Uri
+import android.app.DownloadManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -71,7 +72,6 @@ import androidx.media3.ui.PlayerView
 import com.moviebox.mobile.data.CatalogStore
 import com.moviebox.mobile.data.CatalogTitle
 import com.moviebox.mobile.data.ContentCategory
-import com.moviebox.mobile.data.DownloadManager
 import com.moviebox.mobile.data.DownloadRepository
 import com.moviebox.mobile.data.DownloadStatus
 import com.moviebox.mobile.data.PlaybackSourceType
