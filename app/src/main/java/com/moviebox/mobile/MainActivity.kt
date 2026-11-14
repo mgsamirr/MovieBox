@@ -77,6 +77,8 @@ import com.moviebox.mobile.data.DownloadStatus
 import com.moviebox.mobile.data.PlaybackSourceType
 import com.moviebox.mobile.data.SavedDownload
 import com.moviebox.mobile.data.VodMedia
+import com.moviebox.mobile.data.WatchHistoryStore
+import com.moviebox.mobile.data.RecentTitle
 import kotlinx.coroutines.delay
 import java.util.UUID
 
@@ -102,9 +104,11 @@ private fun MovieBoxApp() {
     val context = LocalContext.current
     val catalog = remember { CatalogStore(context) }
     val downloads = remember { DownloadRepository(context) }
+    val history = remember { WatchHistoryStore(context) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var titles by remember { mutableStateOf(catalog.all()) }
     var queue by remember { mutableStateOf(downloads.all()) }
+    var recent by remember { mutableStateOf(history.all(catalog)) }
     var refresh by remember { mutableStateOf(0) }
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<ContentCategory?>(null) }
@@ -117,6 +121,7 @@ private fun MovieBoxApp() {
     fun reload() {
         titles = catalog.all()
         queue = downloads.all()
+        recent = history.all(catalog)
         refresh++
     }
 
@@ -182,6 +187,7 @@ private fun MovieBoxApp() {
                             when (current) {
                                 AppTab.HOME -> HomeScreen(
                                     titles = titles,
+                                    recent = recent,
                                     onAdd = { editingTitle = null; showEditor = true },
                                     onSelect = { selectedTitle = it },
                                     onCategory = { category = it; tab = AppTab.SEARCH },
@@ -237,6 +243,8 @@ private fun MovieBoxApp() {
             onPlay = {
                 val uri = Uri.parse(item.playbackUrl)
                 if (uri.scheme == "https" && !uri.host.isNullOrBlank()) {
+                    history.markPlayed(item)
+                    recent = history.all(catalog)
                     playerMedia = VodMedia(item.id, item.title, uri, PlaybackSourceType.ONLINE_VOD)
                     selectedTitle = null
                 } else notice = "This title has no authorized online playback link yet."
@@ -269,6 +277,7 @@ private fun MovieBoxApp() {
 @Composable
 private fun HomeScreen(
     titles: List<CatalogTitle>,
+    recent: List<RecentTitle>,
     onAdd: () -> Unit,
     onSelect: (CatalogTitle) -> Unit,
     onCategory: (ContentCategory) -> Unit,
@@ -292,6 +301,10 @@ private fun HomeScreen(
                     FilterChip(selected = false, onClick = { onCategory(c) }, label = { Text(c.label) })
                 }
             }
+        }
+        if (recent.isNotEmpty()) {
+            item { Text("Continue watching", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            items(recent.take(5), key = { "recent-${it.title.id}" }) { TitleCard(it.title, onSelect) }
         }
         item { Text("Recently added", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         if (titles.isEmpty()) {
@@ -356,7 +369,8 @@ private fun TitleCard(item: CatalogTitle, onSelect: (CatalogTitle) -> Unit) {
             }
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(item.title, color = White, fontWeight = FontWeight.SemiBold)
-                Text("${item.category.label} • ${item.language}", color = Muted, fontSize = 11.sp)
+                Text(listOf(item.category.label, item.language, item.releaseYear).filter { it.isNotBlank() }.joinToString(" • "), color = Muted, fontSize = 11.sp)
+                if (item.genre.isNotBlank()) Text(item.genre, color = Accent, fontSize = 10.sp)
                 if (item.synopsis.isNotBlank()) Text(item.synopsis, color = Muted, fontSize = 11.sp, maxLines = 2)
             }
             if (item.isWatchlisted) Icon(Icons.Default.Bookmark, contentDescription = "Saved", tint = Accent)
@@ -405,6 +419,9 @@ private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onS
     var category by remember(initial?.id) { mutableStateOf(initial?.category ?: ContentCategory.MOVIE) }
     var language by remember(initial?.id) { mutableStateOf(initial?.language ?: "Hindi Dubbed") }
     var synopsis by remember(initial?.id) { mutableStateOf(initial?.synopsis.orEmpty()) }
+    var genre by remember(initial?.id) { mutableStateOf(initial?.genre.orEmpty()) }
+    var releaseYear by remember(initial?.id) { mutableStateOf(initial?.releaseYear.orEmpty()) }
+    var posterUrl by remember(initial?.id) { mutableStateOf(initial?.posterUrl.orEmpty()) }
     var playback by remember(initial?.id) { mutableStateOf(initial?.playbackUrl.orEmpty()) }
     var download by remember(initial?.id) { mutableStateOf(initial?.downloadUrl.orEmpty()) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -413,7 +430,7 @@ private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onS
         containerColor = Panel,
         title = { Text(if (initial == null) "Add MovieBox title" else "Edit title", color = White) },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(430.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(500.dp)) {
                 item { OutlinedTextField(title, { title = it }, label = { Text("Movie / series / anime name") }, singleLine = true) }
                 item { Text("Category", color = Muted) }
                 item {
@@ -422,6 +439,9 @@ private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onS
                     }
                 }
                 item { OutlinedTextField(language, { language = it }, label = { Text("Audio language") }, singleLine = true) }
+                item { OutlinedTextField(genre, { genre = it }, label = { Text("Genres (e.g. Action, Comedy)") }, singleLine = true) }
+                item { OutlinedTextField(releaseYear, { releaseYear = it }, label = { Text("Release year") }, singleLine = true) }
+                item { OutlinedTextField(posterUrl, { posterUrl = it }, label = { Text("Poster image HTTPS URL (optional)") }, singleLine = true) }
                 item { OutlinedTextField(synopsis, { synopsis = it }, label = { Text("Description") }, minLines = 2) }
                 item { OutlinedTextField(playback, { playback = it }, label = { Text("Authorized HTTPS playback URL") }, singleLine = true) }
                 item { OutlinedTextField(download, { download = it }, label = { Text("Authorized HTTPS download URL") }, singleLine = true) }
@@ -435,7 +455,8 @@ private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onS
                     title.isBlank() -> error = "Please enter a title."
                     (playback.isNotBlank() && !playback.startsWith("https://")) -> error = "Playback link must use HTTPS."
                     (download.isNotBlank() && !download.startsWith("https://")) -> error = "Download link must use HTTPS."
-                    else -> onSave(CatalogTitle(initial?.id ?: UUID.randomUUID().toString(), title.trim(), category, language.trim().ifBlank { "Hindi Dubbed" }, synopsis.trim(), playback.trim(), download.trim(), initial?.isWatchlisted ?: false))
+                    (posterUrl.isNotBlank() && !posterUrl.startsWith("https://")) -> error = "Poster URL must use HTTPS."
+                    else -> onSave(CatalogTitle(initial?.id ?: UUID.randomUUID().toString(), title.trim(), category, language.trim().ifBlank { "Hindi Dubbed" }, synopsis.trim(), playback.trim(), download.trim(), initial?.isWatchlisted ?: false, genre.trim(), releaseYear.trim(), posterUrl.trim()))
                 }
             }) { Text("Save title") }
         },
