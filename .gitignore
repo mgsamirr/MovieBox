@@ -22,3 +22,10 @@ dist/
 book/
 docs/changelog.md
 docs/contributing.md
+# Android/Gradle local build output and private signing material
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+key.properties

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Back up the local watchlist only; never include downloads, DRM data, or credentials. -->
+        <include domain="sharedpref" path="movie_box.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="movie_box.xml" />
+    </device-transfer>
+</data-extraction-rules>

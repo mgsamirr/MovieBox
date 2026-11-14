@@ -3,12 +3,11 @@ use std::sync::Arc;
 
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{
-    CLOUDFLARE_IPS, GOOGLE_IPS, LookupIpStrategy, NameServerConfigGroup, QUAD9_IPS, ResolverConfig,
+    CLOUDFLARE, GOOGLE, LookupIpStrategy, NameServerConfig, QUAD9, ResolverConfig,
 };
-use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
-const FALLBACK_DNS_PORT: u16 = 53;
 pub const DEFAULT_BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 pub const APP_HTTP_USER_AGENT: &str = concat!("MovieBox-Tui/", env!("CARGO_PKG_VERSION"));
 
@@ -20,9 +19,11 @@ static FALLBACK_RESOLVER: std::sync::LazyLock<Arc<TokioResolver>> =
 
 fn build_fallback_resolver() -> TokioResolver {
     let mut builder =
-        TokioResolver::builder_with_config(fallback_config(), TokioConnectionProvider::default());
+        TokioResolver::builder_with_config(fallback_config(), TokioRuntimeProvider::default());
     builder.options_mut().ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-    builder.build()
+    builder
+        .build()
+        .expect("fallback public DNS resolver configuration must be valid")
 }
 
 #[derive(Debug, Default, Clone)]
@@ -34,20 +35,16 @@ impl FallbackResolver {
     }
 }
 
-fn fallback_servers() -> Vec<std::net::IpAddr> {
-    let mut servers = Vec::with_capacity(CLOUDFLARE_IPS.len() + GOOGLE_IPS.len() + QUAD9_IPS.len());
-    servers.extend_from_slice(CLOUDFLARE_IPS);
-    servers.extend_from_slice(GOOGLE_IPS);
-    servers.extend_from_slice(QUAD9_IPS);
-    servers
+fn fallback_servers() -> Vec<NameServerConfig> {
+    CLOUDFLARE
+        .udp_and_tcp()
+        .chain(GOOGLE.udp_and_tcp())
+        .chain(QUAD9.udp_and_tcp())
+        .collect()
 }
 
 fn fallback_config() -> ResolverConfig {
-    ResolverConfig::from_parts(
-        None,
-        Vec::new(),
-        NameServerConfigGroup::from_ips_clear(&fallback_servers(), FALLBACK_DNS_PORT, true),
-    )
+    ResolverConfig::from_parts(None, Vec::new(), fallback_servers())
 }
 
 fn build_resolver() -> TokioResolver {
@@ -57,14 +54,13 @@ fn build_resolver() -> TokioResolver {
             log::warn!(
                 "system DNS resolver failed ({e}); falling back to public DNS (Cloudflare/Google/Quad9)"
             );
-            TokioResolver::builder_with_config(
-                fallback_config(),
-                TokioConnectionProvider::default(),
-            )
+            TokioResolver::builder_with_config(fallback_config(), TokioRuntimeProvider::default())
         }
     };
     builder.options_mut().ip_strategy = LookupIpStrategy::Ipv4AndIpv6;
-    builder.build()
+    builder
+        .build()
+        .expect("DNS resolver configuration must be valid")
 }
 
 impl Resolve for FallbackResolver {
@@ -194,22 +190,20 @@ mod tests {
         let config = fallback_config();
         let servers = config.name_servers();
         assert!(servers.len() >= 12);
-        assert!(servers.iter().any(|server| server.socket_addr.ip()
-            == std::net::IpAddr::V4(std::net::Ipv4Addr::new(1, 1, 1, 1))));
-        assert!(
-            servers
-                .iter()
-                .any(|server| server.socket_addr.port() == FALLBACK_DNS_PORT)
-        );
+        assert!(servers.iter().any(|server| {
+            server.ip == std::net::IpAddr::V4(std::net::Ipv4Addr::new(1, 1, 1, 1))
+        }));
+        assert!(servers.iter().all(|server| !server.connections.is_empty()));
     }
 
     #[test]
-    fn fallback_servers_deduplicate_nothing_and_cover_all_providers() {
+    fn fallback_servers_cover_all_public_providers() {
         let servers = fallback_servers();
-        assert_eq!(
-            servers.len(),
-            CLOUDFLARE_IPS.len() + GOOGLE_IPS.len() + QUAD9_IPS.len()
-        );
+        assert!(servers.len() >= 12);
+        let ips: Vec<_> = servers.iter().map(|server| server.ip).collect();
+        assert!(ips.contains(&"1.1.1.1".parse().unwrap()));
+        assert!(ips.contains(&"8.8.8.8".parse().unwrap()));
+        assert!(ips.contains(&"9.9.9.9".parse().unwrap()));
     }
 
     #[tokio::test]
@@ -257,6 +251,7 @@ mod tests {
         let url = format!("http://{addr}/video.mkv");
         assert!(probe_url(&url, std::time::Duration::from_secs(2)).await);
     }
+
     #[test]
     fn test_is_http_url() {
         assert!(is_http_url("http://example.com"));
