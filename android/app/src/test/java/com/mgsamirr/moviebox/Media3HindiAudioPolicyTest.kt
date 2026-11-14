@@ -14,13 +14,13 @@ import org.robolectric.RuntimeEnvironment
 class Media3HindiAudioPolicyTest {
     @Test
     fun missingAudioTrackMetadataKeepsVideoAndAudioDisabled() {
-        val context = RuntimeEnvironment.getApplication<android.app.Application>()
+        val context = RuntimeEnvironment.getApplication()
         val selector = DefaultTrackSelector(context)
 
         val result = Media3HindiAudioPolicy.apply(selector, Tracks.EMPTY)
 
         assertNull(result)
-        assertTrue(selector.parameters.getTrackTypeDisabled(C.TRACK_TYPE_AUDIO))
-        assertTrue(selector.parameters.getTrackTypeDisabled(C.TRACK_TYPE_VIDEO))
+        assertTrue(C.TRACK_TYPE_AUDIO in selector.parameters.disabledTrackTypes)
+        assertTrue(C.TRACK_TYPE_VIDEO in selector.parameters.disabledTrackTypes)
     }
 }
