@@ -16,7 +16,10 @@ data class CatalogTitle(
     val synopsis: String,
     val playbackUrl: String,
     val downloadUrl: String,
-    val isWatchlisted: Boolean = false
+    val isWatchlisted: Boolean = false,
+    val genre: String = "",
+    val releaseYear: String = "",
+    val posterUrl: String = ""
 )
 
 class CatalogStore(context: Context) {
@@ -36,7 +39,10 @@ class CatalogStore(context: Context) {
                     synopsis = o.optString("synopsis"),
                     playbackUrl = o.optString("playbackUrl"),
                     downloadUrl = o.optString("downloadUrl"),
-                    isWatchlisted = o.optBoolean("watchlisted")
+                    isWatchlisted = o.optBoolean("watchlisted"),
+                    genre = o.optString("genre"),
+                    releaseYear = o.optString("releaseYear"),
+                    posterUrl = o.optString("posterUrl")
                 ))
             }
         }
@@ -60,7 +66,8 @@ class CatalogStore(context: Context) {
                 put("id", item.id); put("title", item.title); put("category", item.category.name)
                 put("language", item.language); put("synopsis", item.synopsis)
                 put("playbackUrl", item.playbackUrl); put("downloadUrl", item.downloadUrl)
-                put("watchlisted", item.isWatchlisted)
+                put("watchlisted", item.isWatchlisted); put("genre", item.genre)
+                put("releaseYear", item.releaseYear); put("posterUrl", item.posterUrl)
             })
         }
         prefs.edit().putString("items", array.toString()).apply()
