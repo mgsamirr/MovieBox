@@ -11,7 +11,7 @@ import android.os.Environment
  *
  * Call only with a direct-download URL from a source that authorizes downloading.
  */
-class DirectDownload(context: Context) {
+class DirectDownload(private val context: Context) {
     private val manager = context.getSystemService(DownloadManager::class.java)
 
     fun enqueue(url: String, fileName: String, title: String): Long {
