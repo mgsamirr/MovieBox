@@ -422,7 +422,7 @@ private fun HomeScreen(
         }
         item { Text("Recently added", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         if (titles.isEmpty()) {
-            item { EmptyState("Your library is ready", "Add a title with provider-approved details and links. MovieBox does not invent a catalogue.") }
+            item { EmptyState("Catalogue will appear here", "MovieBox titles are supplied through the app catalogue. Users cannot add or edit titles.") }
         } else {
             items(titles.sortedByDescending { it.id }.take(8), key = { it.id }) { TitleCard(it, onSelect) }
         }
