@@ -641,7 +641,7 @@ private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRe
                         if (status?.status == DownloadManager.STATUS_SUCCESSFUL) {
                             TextButton(onClick = { repository.downloadedUri(record.id)?.let(onPlayDownloaded) }) { Text("Play offline") }
                         }
-                        TextButton(onClick = { repository.remove(record.id); onRefresh() }) { Text("Remove download") }
+                        TextButton(onClick = { repository.remove(record.id); onRefresh() }) { Text("Delete offline download") }
                     }
                 }
             }
