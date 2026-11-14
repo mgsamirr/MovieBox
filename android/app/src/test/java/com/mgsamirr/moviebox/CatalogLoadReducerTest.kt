@@ -34,8 +34,8 @@ class CatalogLoadReducerTest {
     }
 
     @Test
-    fun failedStateLimitsProviderErrorLength() {
-        val state = CatalogLoadReducer.failed("x".repeat(300)) as CatalogLoadState.Failed
-        assertEquals(160, state.message.length)
+    fun failedStateNeverLeaksProviderDetails() {
+        val state = CatalogLoadReducer.failed("https://provider.example/?token=secret") as CatalogLoadState.Failed
+        assertEquals("The catalog could not be loaded. Please try again.", state.message)
     }
 }
