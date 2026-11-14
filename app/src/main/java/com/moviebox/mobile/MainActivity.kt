@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,26 +22,37 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,14 +68,23 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.moviebox.mobile.data.DirectDownload
+import com.moviebox.mobile.data.CatalogStore
+import com.moviebox.mobile.data.CatalogTitle
+import com.moviebox.mobile.data.ContentCategory
+import com.moviebox.mobile.data.DownloadManager
+import com.moviebox.mobile.data.DownloadRepository
+import com.moviebox.mobile.data.DownloadStatus
 import com.moviebox.mobile.data.PlaybackSourceType
+import com.moviebox.mobile.data.SavedDownload
 import com.moviebox.mobile.data.VodMedia
+import kotlinx.coroutines.delay
+import java.util.UUID
 
-private val AmoledBlack = Color(0xFF000000)
-private val SurfaceBlack = Color(0xFF101014)
-private val Accent = Color(0xFF8B5CF6)
-private val Muted = Color(0xFF9696A3)
+private val Black = Color(0xFF000000)
+private val Panel = Color(0xFF111116)
+private val Accent = Color(0xFF9B72FF)
+private val Muted = Color(0xFF9A9AA7)
+private val White = Color(0xFFF7F5FA)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,96 +93,123 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String) {
-    HOME("Home"), MOVIES("Movies"), ANIME("Anime"), SERIES("Series"), DOWNLOADS("Downloads")
+private enum class AppTab(val label: String) {
+    HOME("Home"), SEARCH("Search"), WATCHLIST("Saved"), DOWNLOADS("Downloads"), SETTINGS("Settings")
 }
 
 @Composable
 private fun MovieBoxApp() {
-    var selected by remember { mutableStateOf(Tab.HOME) }
-    var mediaToPlay by remember { mutableStateOf<VodMedia?>(null) }
-    var showOnlineDialog by remember { mutableStateOf(false) }
-    var showDownloadDialog by remember { mutableStateOf(false) }
-    var onlineUrl by remember { mutableStateOf("") }
-    var downloadUrl by remember { mutableStateOf("") }
-    var downloadTitle by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val catalog = remember { CatalogStore(context) }
+    val downloads = remember { DownloadRepository(context) }
+    var tab by remember { mutableStateOf(AppTab.HOME) }
+    var titles by remember { mutableStateOf(catalog.all()) }
+    var queue by remember { mutableStateOf(downloads.all()) }
+    var refresh by remember { mutableStateOf(0) }
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf<ContentCategory?>(null) }
+    var selectedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
+    var editingTitle by remember { mutableStateOf<CatalogTitle?>(null) }
+    var showEditor by remember { mutableStateOf(false) }
+    var playerMedia by remember { mutableStateOf<VodMedia?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    fun reload() {
+        titles = catalog.all()
+        queue = downloads.all()
+        refresh++
+    }
+
+    val localPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            mediaToPlay = VodMedia(
-                id = "local-${uri.lastPathSegment ?: "video"}",
-                title = "Downloaded video",
-                uri = uri,
-                sourceType = PlaybackSourceType.DOWNLOADED_FILE
-            )
+            playerMedia = VodMedia("local-${uri.lastPathSegment}", "Offline video", uri, PlaybackSourceType.DOWNLOADED_FILE)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            queue = downloads.all()
+            refresh++
+            delay(2000)
         }
     }
 
     MaterialTheme {
-        Surface(color = AmoledBlack, modifier = Modifier.fillMaxSize()) {
-            if (mediaToPlay != null) {
-                VodPlayer(media = mediaToPlay!!, onClose = { mediaToPlay = null })
+        Surface(Modifier.fillMaxSize(), color = Black) {
+            if (playerMedia != null) {
+                MoviePlayer(playerMedia!!, onClose = { playerMedia = null })
             } else {
                 Scaffold(
-                    containerColor = AmoledBlack,
+                    containerColor = Black,
                     bottomBar = {
-                        NavigationBar(containerColor = SurfaceBlack) {
-                            Tab.entries.forEach { tab ->
+                        NavigationBar(containerColor = Panel) {
+                            AppTab.entries.forEach { item ->
                                 NavigationBarItem(
-                                    selected = selected == tab,
-                                    onClick = { selected = tab },
+                                    selected = tab == item,
+                                    onClick = { tab = item },
                                     icon = {
-                                        Icon(
-                                            imageVector = when (tab) {
-                                                Tab.DOWNLOADS -> Icons.Default.Download
-                                                Tab.MOVIES, Tab.ANIME, Tab.SERIES -> Icons.Default.Movie
-                                                else -> Icons.Default.Home
-                                            },
-                                            contentDescription = tab.label
-                                        )
+                                        Icon(when (item) {
+                                            AppTab.HOME -> Icons.Default.Home
+                                            AppTab.SEARCH -> Icons.Default.Search
+                                            AppTab.WATCHLIST -> Icons.Default.Bookmark
+                                            AppTab.DOWNLOADS -> Icons.Default.Download
+                                            AppTab.SETTINGS -> Icons.Default.Settings
+                                        }, contentDescription = item.label)
                                     },
-                                    label = { Text(tab.label, fontSize = 9.sp) }
+                                    label = { Text(item.label, fontSize = 9.sp) }
                                 )
                             }
                         }
                     }
                 ) { padding ->
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(padding)
-                            .background(AmoledBlack).padding(horizontal = 20.dp)
-                    ) {
-                        Spacer(Modifier.height(24.dp))
+                    Column(Modifier.fillMaxSize().padding(padding).background(Black).padding(horizontal = 18.dp)) {
+                        Spacer(Modifier.height(18.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("MOVIEBOX", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-                                Text("Stream online • Download • Watch offline", color = Muted, fontSize = 12.sp)
+                            Column(Modifier.weight(1f)) {
+                                Text("MOVIEBOX", color = White, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                                Text("Movies • Anime • Web Series", color = Muted, fontSize = 12.sp)
                             }
-                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White, modifier = Modifier.size(26.dp))
+                            Box(Modifier.size(42.dp).background(Panel, CircleShape), contentAlignment = Alignment.Center) {
+                                Text("MB", color = Accent, fontWeight = FontWeight.Bold)
+                            }
                         }
-                        Spacer(Modifier.height(26.dp))
-                        AnimatedContent(targetState = selected, label = "tab-content") { tab ->
-                            when (tab) {
-                                Tab.DOWNLOADS -> DownloadsScreen(onOpenLocal = { picker.launch(arrayOf("video/*")) })
-                                Tab.HOME -> HomeScreen(
-                                    onOpenLocal = { picker.launch(arrayOf("video/*")) },
-                                    onPlayOnline = { showOnlineDialog = true },
-                                    onDownload = { showDownloadDialog = true }
+                        Spacer(Modifier.height(16.dp))
+                        notice?.let { Text(it, color = Accent, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp)) }
+                        AnimatedContent(targetState = tab, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "screen") { current ->
+                            when (current) {
+                                AppTab.HOME -> HomeScreen(
+                                    titles = titles,
+                                    onAdd = { editingTitle = null; showEditor = true },
+                                    onSelect = { selectedTitle = it },
+                                    onCategory = { category = it; tab = AppTab.SEARCH },
+                                    onOpenLocal = { localPicker.launch(arrayOf("video/*")) }
                                 )
-                                Tab.MOVIES -> CategoryScreen("Movies", { showOnlineDialog = true }, { showDownloadDialog = true })
-                                Tab.ANIME -> CategoryScreen("Anime", { showOnlineDialog = true }, { showDownloadDialog = true })
-                                Tab.SERIES -> CategoryScreen("Web Series", { showOnlineDialog = true }, { showDownloadDialog = true })
+                                AppTab.SEARCH -> SearchScreen(
+                                    titles = titles,
+                                    query = query,
+                                    onQuery = { query = it },
+                                    category = category,
+                                    onCategory = { category = it },
+                                    onAdd = { editingTitle = null; showEditor = true },
+                                    onSelect = { selectedTitle = it }
+                                )
+                                AppTab.WATCHLIST -> TitleListScreen(
+                                    heading = "Your watchlist",
+                                    items = titles.filter { it.isWatchlisted },
+                                    empty = "Titles you save will appear here.",
+                                    onSelect = { selectedTitle = it }
+                                )
+                                AppTab.DOWNLOADS -> DownloadsScreen(
+                                    records = queue,
+                                    repository = downloads,
+                                    onRefresh = { reload() },
+                                    onOpenLocal = { localPicker.launch(arrayOf("video/*")) }
+                                )
+                                AppTab.SETTINGS -> SettingsScreen(onOpenLocal = { localPicker.launch(arrayOf("video/*")) }, onAdd = { editingTitle = null; showEditor = true })
                             }
-                        }
-                        message?.let { text ->
-                            Text(text, color = Accent, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
                         }
                     }
                 }
@@ -167,154 +217,294 @@ private fun MovieBoxApp() {
         }
     }
 
-    if (showOnlineDialog) {
-        AlertDialog(
-            onDismissRequest = { showOnlineDialog = false },
-            containerColor = SurfaceBlack,
-            title = { Text("Play online", color = Color.White) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Paste an authorized HTTPS on-demand video URL. Live streams are not supported.", color = Muted, fontSize = 12.sp)
-                    OutlinedTextField(
-                        value = onlineUrl,
-                        onValueChange = { onlineUrl = it },
-                        label = { Text("HTTPS video URL") },
-                        singleLine = true
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    val uri = Uri.parse(onlineUrl.trim())
-                    if (uri.scheme == "https" && !uri.host.isNullOrBlank()) {
-                        mediaToPlay = VodMedia(
-                            id = "online-${uri.lastPathSegment ?: "vod"}",
-                            title = "Online video",
-                            uri = uri,
-                            sourceType = PlaybackSourceType.ONLINE_VOD
-                        )
-                        message = null
-                        showOnlineDialog = false
-                        onlineUrl = ""
-                    } else {
-                        message = "Please enter a valid HTTPS video URL."
-                    }
-                }) { Text("Play") }
-            },
-            dismissButton = { TextButton(onClick = { showOnlineDialog = false }) { Text("Cancel") } }
+    if (showEditor) {
+        TitleEditorDialog(
+            initial = editingTitle,
+            onDismiss = { showEditor = false },
+            onSave = { item ->
+                catalog.save(item)
+                reload()
+                showEditor = false
+                notice = "Title saved to your MovieBox library."
+            }
         )
     }
 
-    if (showDownloadDialog) {
-        AlertDialog(
-            onDismissRequest = { showDownloadDialog = false },
-            containerColor = SurfaceBlack,
-            title = { Text("Download for offline", color = Color.White) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Use a direct HTTPS download link supplied by an authorized content source.", color = Muted, fontSize = 12.sp)
-                    OutlinedTextField(value = downloadTitle, onValueChange = { downloadTitle = it }, label = { Text("Movie / episode name") }, singleLine = true)
-                    OutlinedTextField(value = downloadUrl, onValueChange = { downloadUrl = it }, label = { Text("Direct HTTPS download URL") }, singleLine = true)
-                }
+    selectedTitle?.let { item ->
+        TitleDetailsDialog(
+            item = item,
+            onDismiss = { selectedTitle = null },
+            onPlay = {
+                val uri = Uri.parse(item.playbackUrl)
+                if (uri.scheme == "https" && !uri.host.isNullOrBlank()) {
+                    playerMedia = VodMedia(item.id, item.title, uri, PlaybackSourceType.ONLINE_VOD)
+                    selectedTitle = null
+                } else notice = "This title has no authorized online playback link yet."
             },
-            confirmButton = {
-                Button(onClick = {
-                    runCatching {
-                        DirectDownload(context).enqueue(
-                            url = downloadUrl.trim(),
-                            fileName = Uri.parse(downloadUrl.trim()).lastPathSegment ?: "movie-download.mp4",
-                            title = downloadTitle.trim().ifBlank { "MovieBox download" }
-                        )
-                    }.onSuccess {
-                        message = "Download started. Android will show its progress notification."
-                        showDownloadDialog = false
-                        downloadUrl = ""
-                        downloadTitle = ""
-                    }.onFailure {
-                        message = it.message ?: "Could not start download."
-                    }
-                }) { Text("Start download") }
+            onDownload = {
+                runCatching {
+                    downloads.enqueue(item.downloadUrl, item.title, item.title + ".mp4")
+                }.onSuccess {
+                    reload()
+                    notice = "Download added. Progress is shown in Downloads."
+                    selectedTitle = null
+                }.onFailure { notice = it.message ?: "Download could not start." }
             },
-            dismissButton = { TextButton(onClick = { showDownloadDialog = false }) { Text("Cancel") } }
+            onWatchlist = {
+                catalog.toggleWatchlist(item.id)
+                reload()
+                selectedTitle = catalog.all().firstOrNull { it.id == item.id }
+            },
+            onEdit = { editingTitle = item; selectedTitle = null; showEditor = true },
+            onDelete = {
+                catalog.delete(item.id)
+                reload()
+                selectedTitle = null
+                notice = "Title removed from your library."
+            }
         )
     }
 }
 
 @Composable
 private fun HomeScreen(
-    onOpenLocal: () -> Unit,
-    onPlayOnline: () -> Unit,
-    onDownload: () -> Unit
+    titles: List<CatalogTitle>,
+    onAdd: () -> Unit,
+    onSelect: (CatalogTitle) -> Unit,
+    onCategory: (ContentCategory) -> Unit,
+    onOpenLocal: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(190.dp)
-                .background(SurfaceBlack, RoundedCornerShape(24.dp)).padding(20.dp),
-            contentAlignment = Alignment.BottomStart
-        ) {
-            Column {
-                Text("YOUR ENTERTAINMENT SPACE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("Stream it now.\nDownload for later.", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, lineHeight = 30.sp)
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxSize()) {
+        item {
+            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("YOUR ENTERTAINMENT SPACE", color = Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Text("Find your next story.", color = White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                    Text("Hindi-dubbed movies, anime and web series in one place.", color = Muted, fontSize = 13.sp)
+                    Button(onClick = onAdd) { Text("＋ Add a title") }
+                }
             }
         }
-        Text("Watch your way", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text("Movies, anime and web series. Hindi-dubbed discovery is the priority.", color = Muted, fontSize = 13.sp)
-        ActionCard("Play an online movie or episode", "Play an authorized on-demand HTTPS video", Icons.Default.PlayArrow, onPlayOnline)
-        ActionCard("Download for offline", "Save a direct-download video to this phone", Icons.Default.Download, onDownload)
-        ActionCard("Open a downloaded video", "Choose a video already saved on your phone", Icons.Default.Movie, onOpenLocal)
-    }
-}
-
-@Composable
-private fun DownloadsScreen(onOpenLocal: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Downloads", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-        Text("Offline videos saved on this phone", color = Muted, fontSize = 13.sp)
-        Box(
-            modifier = Modifier.fillMaxWidth().height(150.dp)
-                .background(SurfaceBlack, RoundedCornerShape(20.dp)).padding(18.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Download, contentDescription = null, tint = Accent, modifier = Modifier.size(34.dp))
-                Spacer(Modifier.height(10.dp))
-                Text("Choose a saved video to play", color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text("The Android file picker opens your local videos.", color = Muted, fontSize = 12.sp)
+        item { Text("Explore categories", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ContentCategory.entries.forEach { c ->
+                    FilterChip(selected = false, onClick = { onCategory(c) }, label = { Text(c.label) })
+                }
             }
         }
-        ActionCard("Browse offline videos", "Select a downloaded movie or episode", Icons.Default.Movie, onOpenLocal)
+        item { Text("Recently added", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        if (titles.isEmpty()) {
+            item { EmptyState("Your library is ready", "Add a title with provider-approved details and links. MovieBox does not invent a catalogue.") }
+        } else {
+            items(titles.sortedByDescending { it.id }.take(8), key = { it.id }) { TitleCard(it, onSelect) }
+        }
+        item { OutlinedButton(onClick = onOpenLocal, modifier = Modifier.fillMaxWidth()) { Text("Open a video already on this phone") } }
+        item { Spacer(Modifier.height(12.dp)) }
     }
 }
 
 @Composable
-private fun CategoryScreen(name: String, onPlayOnline: () -> Unit, onDownload: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(name, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-        Text("On-demand titles only • Hindi dubbed preferred", color = Muted, fontSize = 13.sp)
-        Text("When a provider supplies an authorized title link, play it online or download it for offline viewing.", color = Muted, fontSize = 13.sp)
-        ActionCard("Play an online title", "Paste an authorized HTTPS VOD link", Icons.Default.PlayArrow, onPlayOnline)
-        ActionCard("Download a title", "Paste an authorized direct-download link", Icons.Default.Download, onDownload)
+private fun SearchScreen(
+    titles: List<CatalogTitle>,
+    query: String,
+    onQuery: (String) -> Unit,
+    category: ContentCategory?,
+    onCategory: (ContentCategory?) -> Unit,
+    onAdd: () -> Unit,
+    onSelect: (CatalogTitle) -> Unit
+) {
+    val filtered = titles.filter {
+        (category == null || it.category == category) &&
+            (query.isBlank() || it.title.contains(query, true) || it.language.contains(query, true) || it.synopsis.contains(query, true))
+    }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Search your library", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        OutlinedTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Search titles") })
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(selected = category == null, onClick = { onCategory(null) }, label = { Text("All") })
+            ContentCategory.entries.forEach { c -> FilterChip(selected = category == c, onClick = { onCategory(if (category == c) null else c) }, label = { Text(c.label) }) }
+        }
+        if (filtered.isEmpty()) {
+            EmptyState("No matching titles", "Add a provider-authorized title to start building your catalogue.")
+            Button(onClick = onAdd) { Text("Add title") }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(filtered, key = { it.id }) { TitleCard(it, onSelect) } }
+        }
     }
 }
 
 @Composable
-private fun ActionCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().background(SurfaceBlack, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun TitleListScreen(heading: String, items: List<CatalogTitle>, empty: String, onSelect: (CatalogTitle) -> Unit) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(heading, color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        if (items.isEmpty()) EmptyState("Nothing saved yet", empty)
+        else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(items, key = { it.id }) { TitleCard(it, onSelect) } }
+    }
+}
+
+@Composable
+private fun TitleCard(item: CatalogTitle, onSelect: (CatalogTitle) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onSelect(item) },
+        colors = CardDefaults.cardColors(containerColor = Panel),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(30.dp))
-        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = Muted, fontSize = 11.sp)
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(52.dp).background(Color(0xFF211A32), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Movie, contentDescription = null, tint = Accent, modifier = Modifier.size(28.dp))
+            }
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(item.title, color = White, fontWeight = FontWeight.SemiBold)
+                Text("${item.category.label} • ${item.language}", color = Muted, fontSize = 11.sp)
+                if (item.synopsis.isNotBlank()) Text(item.synopsis, color = Muted, fontSize = 11.sp, maxLines = 2)
+            }
+            if (item.isWatchlisted) Icon(Icons.Default.Bookmark, contentDescription = "Saved", tint = Accent)
         }
     }
 }
 
 @Composable
-private fun VodPlayer(media: VodMedia, onClose: () -> Unit) {
+private fun TitleDetailsDialog(
+    item: CatalogTitle,
+    onDismiss: () -> Unit,
+    onPlay: () -> Unit,
+    onDownload: () -> Unit,
+    onWatchlist: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Panel,
+        title = { Text(item.title, color = White) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${item.category.label} • ${item.language}", color = Accent, fontSize = 12.sp)
+                Text(item.synopsis.ifBlank { "No description added." }, color = Muted)
+                Text(if (item.playbackUrl.isBlank()) "Online link: not added" else "Online link: available", color = Muted, fontSize = 12.sp)
+                Text(if (item.downloadUrl.isBlank()) "Download link: not added" else "Download link: available", color = Muted, fontSize = 12.sp)
+            }
+        },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                Button(onClick = onPlay, enabled = item.playbackUrl.isNotBlank()) { Text("Play online") }
+                TextButton(onClick = onDownload, enabled = item.downloadUrl.isNotBlank()) { Text("Download offline") }
+                TextButton(onClick = onWatchlist) { Text(if (item.isWatchlisted) "Remove from saved" else "Add to watchlist") }
+                TextButton(onClick = onEdit) { Text("Edit title") }
+                TextButton(onClick = onDelete) { Text("Remove title") }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+    )
+}
+
+@Composable
+private fun TitleEditorDialog(initial: CatalogTitle?, onDismiss: () -> Unit, onSave: (CatalogTitle) -> Unit) {
+    var title by remember(initial?.id) { mutableStateOf(initial?.title.orEmpty()) }
+    var category by remember(initial?.id) { mutableStateOf(initial?.category ?: ContentCategory.MOVIE) }
+    var language by remember(initial?.id) { mutableStateOf(initial?.language ?: "Hindi Dubbed") }
+    var synopsis by remember(initial?.id) { mutableStateOf(initial?.synopsis.orEmpty()) }
+    var playback by remember(initial?.id) { mutableStateOf(initial?.playbackUrl.orEmpty()) }
+    var download by remember(initial?.id) { mutableStateOf(initial?.downloadUrl.orEmpty()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Panel,
+        title = { Text(if (initial == null) "Add MovieBox title" else "Edit title", color = White) },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.height(430.dp)) {
+                item { OutlinedTextField(title, { title = it }, label = { Text("Movie / series / anime name") }, singleLine = true) }
+                item { Text("Category", color = Muted) }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ContentCategory.entries.forEach { c -> FilterChip(selected = category == c, onClick = { category = c }, label = { Text(c.label, fontSize = 10.sp) }) }
+                    }
+                }
+                item { OutlinedTextField(language, { language = it }, label = { Text("Audio language") }, singleLine = true) }
+                item { OutlinedTextField(synopsis, { synopsis = it }, label = { Text("Description") }, minLines = 2) }
+                item { OutlinedTextField(playback, { playback = it }, label = { Text("Authorized HTTPS playback URL") }, singleLine = true) }
+                item { OutlinedTextField(download, { download = it }, label = { Text("Authorized HTTPS download URL") }, singleLine = true) }
+                item { Text("Only add links supplied by a provider that authorizes playback or downloading.", color = Muted, fontSize = 11.sp) }
+                error?.let { item { Text(it, color = Color(0xFFFF7777), fontSize = 12.sp) } }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                when {
+                    title.isBlank() -> error = "Please enter a title."
+                    (playback.isNotBlank() && !playback.startsWith("https://")) -> error = "Playback link must use HTTPS."
+                    (download.isNotBlank() && !download.startsWith("https://")) -> error = "Download link must use HTTPS."
+                    else -> onSave(CatalogTitle(initial?.id ?: UUID.randomUUID().toString(), title.trim(), category, language.trim().ifBlank { "Hindi Dubbed" }, synopsis.trim(), playback.trim(), download.trim(), initial?.isWatchlisted ?: false))
+                }
+            }) { Text("Save title") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRepository, onRefresh: () -> Unit, onOpenLocal: () -> Unit) {
+    var statuses by remember { mutableStateOf<Map<Long, DownloadStatus?>>(emptyMap()) }
+    LaunchedEffect(records, records.size) {
+        statuses = records.associate { it.id to repository.status(it.id) }
+    }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Downloads", color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Text("Your offline download queue", color = Muted, fontSize = 12.sp)
+        if (records.isEmpty()) EmptyState("No downloads yet", "Open a title and choose Download offline, or browse a video already saved on your phone.")
+        else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+            items(records, key = { it.id }) { record ->
+                val status = statuses[record.id]
+                Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(record.title, color = White, fontWeight = FontWeight.SemiBold)
+                        Text(status?.label() ?: "Checking status", color = Accent, fontSize = 12.sp)
+                        if (status != null && status.totalBytes > 0 && status.status == DownloadManager.STATUS_RUNNING) {
+                            val progress = (status.downloadedBytes.toFloat() / status.totalBytes).coerceIn(0f, 1f)
+                            CircularProgressIndicator(progress = { progress }, color = Accent, trackColor = Color.DarkGray)
+                            Text("${(progress * 100).toInt()}% downloaded", color = Muted, fontSize = 11.sp)
+                        }
+                        Text(record.fileName, color = Muted, fontSize = 10.sp)
+                        TextButton(onClick = { repository.remove(record.id); onRefresh() }) { Text("Remove download") }
+                    }
+                }
+            }
+        }
+        OutlinedButton(onClick = onOpenLocal, modifier = Modifier.fillMaxWidth()) { Text("Browse phone videos") }
+    }
+}
+
+@Composable
+private fun SettingsScreen(onOpenLocal: () -> Unit, onAdd: () -> Unit) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Settings", color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("MovieBox", color = White, fontWeight = FontWeight.Bold)
+                Text("AMOLED dark • Android phone • On-demand movies, anime and web series", color = Muted, fontSize = 12.sp)
+                Text("Hindi-dubbed titles are prioritized. The catalogue is stored on this device.", color = Muted, fontSize = 12.sp)
+            }
+        }
+        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add a catalogue title") }
+        OutlinedButton(onClick = onOpenLocal, modifier = Modifier.fillMaxWidth()) { Text("Open local video") }
+        Text("No Live TV, IPTV, M3U, browser or WebView features.", color = Muted, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun EmptyState(title: String, description: String) {
+    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Movie, contentDescription = null, tint = Accent, modifier = Modifier.size(32.dp))
+            Text(title, color = White, fontWeight = FontWeight.SemiBold)
+            Text(description, color = Muted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun MoviePlayer(media: VodMedia, onClose: () -> Unit) {
     val context = LocalContext.current
     val player = remember(media.id, media.uri) {
         ExoPlayer.Builder(context).build().apply {
@@ -323,15 +513,9 @@ private fun VodPlayer(media: VodMedia, onClose: () -> Unit) {
             playWhenReady = true
         }
     }
-    DisposableEffect(player) {
-        onDispose { player.release() }
-    }
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Text("←  Back to MovieBox", color = Color.White, modifier = Modifier.clickable(onClick = onClose).padding(16.dp))
-        AndroidView(
-            factory = { ctx -> PlayerView(ctx).apply { this.player = player } },
-            update = { it.player = player },
-            modifier = Modifier.fillMaxWidth().weight(1f)
-        )
+    androidx.compose.runtime.DisposableEffect(player) { onDispose { player.release() } }
+    Column(Modifier.fillMaxSize().background(Black)) {
+        Text("←  Back to MovieBox", color = White, modifier = Modifier.clickable(onClick = onClose).padding(16.dp))
+        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().weight(1f))
     }
 }
