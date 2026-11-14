@@ -283,6 +283,11 @@ private fun MovieBoxApp() {
         EpisodeManagementDialog(
             series = series,
             onDismiss = { managingEpisodesFor = null },
+            onDownload = { episode ->
+                runCatching { downloads.enqueue(episode.downloadUrl, "${series.title} • ${episode.title}", "${series.title}-S${episode.seasonNumber}E${episode.episodeNumber}.mp4") }
+                    .onSuccess { reload(); notice = "Episode download queue mein add ho gaya." }
+                    .onFailure { notice = it.message ?: "Episode download start nahi hua." }
+            },
             onPlay = { episode ->
                 val uri = Uri.parse(episode.playbackUrl)
                 if (uri.scheme == "https" && !uri.host.isNullOrBlank()) {
