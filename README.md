@@ -17,6 +17,8 @@ MovieBox is a native, touch-first Android phone app for on-demand movies, anime,
 - Search and category filtering, Hindi-dubbed language metadata, synopsis, genre, release year, and poster artwork.
 - Saved watchlist and recently watched history.
 - Editable catalogue entries with provider-authorized HTTPS playback/download links.
+- Season and episode management for web series and anime, with season grouping, episode numbering, descriptions, duration metadata, and per-episode authorized HTTPS playback/download links.
+- Episode catalogue is stored locally per series; episodes can be played in the built-in Media3 VOD player.
 - Download queue with Android DownloadManager status and progress.
 - Local video picker and offline playback through Media3.
 
@@ -26,7 +28,7 @@ MovieBox is a native, touch-first Android phone app for on-demand movies, anime,
 - Live TV, IPTV, M3U playlists, and live channels.
 - Terminal UI, CLI commands, keyboard/mouse terminal navigation, terminal themes, Ratatui/Crossterm.
 
-**Important:** Online playback is for on-demand movies and episodes only, not live broadcasts. Actual catalogue and provider integration must be connected to sources that authorize playback and downloads. The current build provides a usable local catalogue and playback/download foundation. A hosted catalogue backend, provider integrations, episode/season management, playback resume position, subtitles/audio-track selection, parental controls, and final device testing remain future work.
+**Important:** Online playback is for on-demand movies and episodes only, not live broadcasts. Actual catalogue and provider integration must be connected to sources that authorize playback and downloads. The current build provides a usable local catalogue and playback/download foundation. A hosted catalogue backend, provider integrations, hosted catalogue backend/provider integration, subtitles/audio-track selection, parental controls, and final device testing remain future work.
 
 ## Build
 Open in Android Studio with Android SDK 36 and JDK 17, sync Gradle, then run the app configuration on an Android phone.
