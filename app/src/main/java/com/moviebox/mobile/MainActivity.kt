@@ -63,6 +63,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -78,6 +81,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.CaptionStyleCompat
 import com.moviebox.mobile.data.CatalogStore
+import com.moviebox.mobile.data.ParentalControlStore
 import com.moviebox.mobile.data.CatalogTitle
 import com.moviebox.mobile.data.ContentCategory
 import com.moviebox.mobile.data.DownloadRepository
@@ -104,6 +108,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class PinDialogMode { CREATE, VERIFY_TAB, VERIFY_FOR_CHANGE, VERIFY_FOR_DISABLE }
+
 private enum class AppTab(val label: String) {
     HOME("Home"), SEARCH("Search"), WATCHLIST("Saved"), DOWNLOADS("Downloads"), SETTINGS("Settings")
 }
@@ -115,6 +121,12 @@ private fun MovieBoxApp() {
     val downloads = remember { DownloadRepository(context) }
     val history = remember { WatchHistoryStore(context) }
     val playbackProgress = remember { PlaybackProgressStore(context) }
+    val parentalControls = remember { ParentalControlStore(context) }
+    var parentalPinEnabled by remember { mutableStateOf(parentalControls.isEnabled()) }
+    var pinDialogMode by remember { mutableStateOf<PinDialogMode?>(null) }
+    var pinTargetTab by remember { mutableStateOf<AppTab?>(null) }
+    var pinInput by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf<String?>(null) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var titles by remember { mutableStateOf(catalog.all()) }
     var queue by remember { mutableStateOf(downloads.all()) }
@@ -165,7 +177,14 @@ private fun MovieBoxApp() {
                             AppTab.entries.forEach { item ->
                                 NavigationBarItem(
                                     selected = tab == item,
-                                    onClick = { tab = item },
+                                    onClick = {
+                                        if (parentalPinEnabled && item in listOf(AppTab.WATCHLIST, AppTab.DOWNLOADS, AppTab.SETTINGS)) {
+                                            pinTargetTab = item
+                                            pinInput = ""
+                                            pinError = null
+                                            pinDialogMode = PinDialogMode.VERIFY_TAB
+                                        } else tab = item
+                                    },
                                     icon = {
                                         Icon(when (item) {
                                             AppTab.HOME -> Icons.Default.Home
@@ -226,13 +245,87 @@ private fun MovieBoxApp() {
                                     onPlayDownloaded = { uri -> playerMedia = VodMedia("download-${uri.lastPathSegment}", "Offline download", uri, PlaybackSourceType.DOWNLOADED_FILE) },
                                     onOpenLocal = { localPicker.launch(arrayOf("video/*")) }
                                 )
-                                AppTab.SETTINGS -> SettingsScreen(onOpenLocal = { localPicker.launch(arrayOf("video/*")) }, onAdd = { editingTitle = null; showEditor = true })
+                                AppTab.SETTINGS -> SettingsScreen(
+                                    onOpenLocal = { localPicker.launch(arrayOf("video/*")) },
+                                    onAdd = { editingTitle = null; showEditor = true },
+                                    pinEnabled = parentalPinEnabled,
+                                    onSetOrChangePin = {
+                                        pinInput = ""
+                                        pinError = null
+                                        pinDialogMode = if (parentalPinEnabled) PinDialogMode.VERIFY_FOR_CHANGE else PinDialogMode.CREATE
+                                    },
+                                    onDisablePin = {
+                                        pinInput = ""
+                                        pinError = null
+                                        pinDialogMode = PinDialogMode.VERIFY_FOR_DISABLE
+                                    }
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+
+    pinDialogMode?.let { mode ->
+        val dialogTitle = when (mode) {
+            PinDialogMode.CREATE -> if (parentalPinEnabled) "Set new parental PIN" else "Create parental PIN"
+            PinDialogMode.VERIFY_TAB -> "Parental PIN required"
+            PinDialogMode.VERIFY_FOR_CHANGE -> "Confirm current PIN"
+            PinDialogMode.VERIFY_FOR_DISABLE -> "Turn off parental PIN"
+        }
+        val dialogMessage = when (mode) {
+            PinDialogMode.CREATE -> "Create a 4-digit PIN. It will protect Saved, Downloads and Settings."
+            PinDialogMode.VERIFY_TAB -> "Enter your 4-digit PIN to open " + (pinTargetTab?.label ?: "this section") + "."
+            PinDialogMode.VERIFY_FOR_CHANGE -> "Enter your current PIN before creating a new one."
+            PinDialogMode.VERIFY_FOR_DISABLE -> "Enter your current PIN to turn off parental protection."
+        }
+        ParentalPinDialog(
+            title = dialogTitle,
+            message = dialogMessage,
+            value = pinInput,
+            error = pinError,
+            confirmLabel = if (mode == PinDialogMode.CREATE) "Save PIN" else "Continue",
+            onValueChange = { pinInput = it; pinError = null },
+            onDismiss = { pinDialogMode = null; pinTargetTab = null },
+            onConfirm = {
+                when (mode) {
+                    PinDialogMode.CREATE -> {
+                        if (pinInput.length != 4) pinError = "Enter exactly 4 digits."
+                        else {
+                            parentalControls.setPin(pinInput)
+                            parentalPinEnabled = true
+                            pinDialogMode = null
+                            pinError = null
+                        }
+                    }
+                    PinDialogMode.VERIFY_TAB -> {
+                        if (parentalControls.verifyPin(pinInput)) {
+                            tab = pinTargetTab ?: AppTab.SETTINGS
+                            pinDialogMode = null
+                            pinTargetTab = null
+                        } else pinError = "Incorrect PIN. Try again."
+                    }
+                    PinDialogMode.VERIFY_FOR_CHANGE -> {
+                        if (parentalControls.verifyPin(pinInput)) {
+                            pinInput = ""
+                            pinError = null
+                            pinDialogMode = PinDialogMode.CREATE
+                        } else pinError = "Incorrect current PIN."
+                    }
+                    PinDialogMode.VERIFY_FOR_DISABLE -> {
+                        if (parentalControls.verifyPin(pinInput)) {
+                            parentalControls.clearPin()
+                            parentalPinEnabled = false
+                            pinDialogMode = null
+                            pinError = null
+                        } else pinError = "Incorrect current PIN."
+                    }
+                }
+            }
+        )
     }
 
     if (showEditor) {
@@ -541,7 +634,13 @@ private fun DownloadsScreen(records: List<SavedDownload>, repository: DownloadRe
 }
 
 @Composable
-private fun SettingsScreen(onOpenLocal: () -> Unit, onAdd: () -> Unit) {
+private fun SettingsScreen(
+    onOpenLocal: () -> Unit,
+    onAdd: () -> Unit,
+    pinEnabled: Boolean,
+    onSetOrChangePin: () -> Unit,
+    onDisablePin: () -> Unit
+) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
         Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -551,10 +650,63 @@ private fun SettingsScreen(onOpenLocal: () -> Unit, onAdd: () -> Unit) {
                 Text("Hindi-dubbed titles are prioritized. The catalogue is stored on this device.", color = Muted, fontSize = 12.sp)
             }
         }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Parental Controls", color = White, fontWeight = FontWeight.Bold)
+                Text(
+                    if (pinEnabled) "PIN protection is on for Saved, Downloads and Settings."
+                    else "Add a 4-digit PIN to protect Saved, Downloads and Settings.",
+                    color = Muted,
+                    fontSize = 12.sp
+                )
+                OutlinedButton(onClick = onSetOrChangePin, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (pinEnabled) "Change parental PIN" else "Set parental PIN")
+                }
+                if (pinEnabled) {
+                    TextButton(onClick = onDisablePin) { Text("Turn off PIN protection") }
+                }
+            }
+        }
         OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth()) { Text("Add a catalogue title") }
         OutlinedButton(onClick = onOpenLocal, modifier = Modifier.fillMaxWidth()) { Text("Open local video") }
         Text("No Live TV, IPTV, M3U, browser or WebView features.", color = Muted, fontSize = 12.sp)
     }
+}
+
+
+@Composable
+private fun ParentalPinDialog(
+    title: String,
+    message: String,
+    value: String,
+    error: String?,
+    confirmLabel: String,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Panel,
+        title = { Text(title, color = White) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(message, color = Muted, fontSize = 13.sp)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { input -> onValueChange(input.filter(Char::isDigit).take(4)) },
+                    label = { Text("4-digit PIN") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    isError = error != null,
+                    supportingText = error?.let { { Text(it) } }
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
