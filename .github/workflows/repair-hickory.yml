@@ -26,7 +26,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.90.0"
-      - name: Upgrade Hickory resolver
+      - name: Update resolver and patched transitive dependencies
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -34,15 +34,22 @@ jobs:
           text = path.read_text()
           old = 'hickory-resolver = { version = "0.25.2",'
           new = 'hickory-resolver = { version = "0.26.3",'
-          if old not in text:
-              raise SystemExit("Expected hickory-resolver 0.25.2 declaration was not found; refusing to guess.")
-          path.write_text(text.replace(old, new, 1))
+          if old in text:
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+          elif new not in text:
+              raise SystemExit("Expected Hickory resolver declaration was not found; refusing to guess.")
           PY
           cargo update -p hickory-resolver --precise 0.26.3
+          cargo update -p quinn-udp --precise 0.5.16
+          cargo update -p rustix@1.1.4 --precise 1.1.6
+          cargo update -p chacha20 --precise 0.10.2
       - name: Compile all targets and features
         run: cargo check --all-targets --all-features --locked
       - name: Run test suite
         run: cargo test --all-features --locked
+      - name: Audit dependencies before committing
+        run: cargo audit
       - name: Commit validated dependency update
         run: |
           if git diff --quiet -- Cargo.toml Cargo.lock; then
@@ -52,10 +59,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Cargo.toml Cargo.lock
-          git commit -m "fix: upgrade Hickory DNS resolver"
+          git commit -m "security: update patched transitive dependencies"
           git push origin HEAD:android-native-port
-      - name: Audit dependencies
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-audit
-      - run: cargo audit
