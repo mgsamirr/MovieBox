@@ -75,6 +75,8 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
+import androidx.media3.ui.CaptionStyleCompat
 import com.moviebox.mobile.data.CatalogStore
 import com.moviebox.mobile.data.CatalogTitle
 import com.moviebox.mobile.data.ContentCategory
@@ -581,6 +583,24 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
     var availableTracks by remember(player) { mutableStateOf(player.currentTracks) }
     var trackPickerType by remember { mutableStateOf<Int?>(null) }
     var subtitleMessage by remember { mutableStateOf<String?>(null) }
+    var showSubtitleAppearance by remember { mutableStateOf(false) }
+    val playerPrefs = remember { context.getSharedPreferences("moviebox_player_settings", android.content.Context.MODE_PRIVATE) }
+    var subtitleTextSize by remember { mutableStateOf(playerPrefs.getFloat("subtitle_text_size", 0.055f)) }
+    var subtitleDarkBackground by remember { mutableStateOf(playerPrefs.getBoolean("subtitle_dark_background", true)) }
+    var subtitleView by remember { mutableStateOf<SubtitleView?>(null) }
+    LaunchedEffect(subtitleView, subtitleTextSize, subtitleDarkBackground) {
+        subtitleView?.setFractionalTextSize(subtitleTextSize, false)
+        subtitleView?.setStyle(
+            CaptionStyleCompat(
+                android.graphics.Color.WHITE,
+                if (subtitleDarkBackground) android.graphics.Color.argb(210, 0, 0, 0) else android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT,
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                android.graphics.Color.BLACK,
+                null
+            )
+        )
+    }
     val externalSubtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val extension = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
@@ -639,7 +659,11 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
     }
     Column(Modifier.fillMaxSize().background(Black)) {
         Text("←  Back to MovieBox", color = White, modifier = Modifier.clickable(onClick = onClose).padding(16.dp))
-        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().weight(1f))
+        AndroidView(
+            factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true; subtitleView = this.subtitleView } },
+            update = { view -> view.player = player; subtitleView = view.subtitleView },
+            modifier = Modifier.fillMaxWidth().weight(1f)
+        )
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_AUDIO }, modifier = Modifier.weight(1f)) { Text("Audio track") }
             OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_TEXT }, modifier = Modifier.weight(1f)) { Text("Subtitles") }
@@ -648,9 +672,28 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
             onClick = { externalSubtitlePicker.launch(arrayOf("*/*")) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         ) { Text("Load external subtitle (.SRT / .VTT)") }
+        OutlinedButton(
+            onClick = { showSubtitleAppearance = true },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) { Text("Subtitle appearance") }
         subtitleMessage?.let { message ->
             Text(message, color = if (message.startsWith("External")) Accent else Muted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         }
+    }
+    if (showSubtitleAppearance) {
+        SubtitleAppearanceDialog(
+            textSize = subtitleTextSize,
+            darkBackground = subtitleDarkBackground,
+            onTextSizeChange = { value ->
+                subtitleTextSize = value
+                playerPrefs.edit().putFloat("subtitle_text_size", value).apply()
+            },
+            onBackgroundChange = { enabled ->
+                subtitleDarkBackground = enabled
+                playerPrefs.edit().putBoolean("subtitle_dark_background", enabled).apply()
+            },
+            onDismiss = { showSubtitleAppearance = false }
+        )
     }
     trackPickerType?.let { type ->
         TrackPickerDialog(
@@ -660,6 +703,56 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
             onDismiss = { trackPickerType = null }
         )
     }
+}
+
+
+@Composable
+private fun SubtitleAppearanceDialog(
+    textSize: Float,
+    darkBackground: Boolean,
+    onTextSizeChange: (Float) -> Unit,
+    onBackgroundChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Panel,
+        title = { Text("Subtitle appearance", color = White) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Text size", color = White, fontWeight = FontWeight.SemiBold)
+                Slider(
+                    value = textSize,
+                    onValueChange = onTextSizeChange,
+                    valueRange = 0.035f..0.09f
+                )
+                Text(
+                    when {
+                        textSize < 0.048f -> "Small"
+                        textSize > 0.072f -> "Large"
+                        else -> "Medium"
+                    },
+                    color = Muted,
+                    fontSize = 12.sp
+                )
+                Text("Subtitle background", color = White, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = darkBackground,
+                        onClick = { onBackgroundChange(true) },
+                        label = { Text("Dark") }
+                    )
+                    FilterChip(
+                        selected = !darkBackground,
+                        onClick = { onBackgroundChange(false) },
+                        label = { Text("Transparent") }
+                    )
+                }
+                Text("Changes are saved on this device.", color = Muted, fontSize = 11.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
 }
 
 @Composable
