@@ -69,6 +69,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.Player
@@ -579,6 +580,36 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
     }
     var availableTracks by remember(player) { mutableStateOf(player.currentTracks) }
     var trackPickerType by remember { mutableStateOf<Int?>(null) }
+    var subtitleMessage by remember { mutableStateOf<String?>(null) }
+    val externalSubtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val extension = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()
+            val mime = context.contentResolver.getType(uri)?.lowercase()
+            val subtitleMime = when {
+                extension == "srt" || mime == "application/x-subrip" || mime == "application/srt" -> MimeTypes.APPLICATION_SUBRIP
+                extension == "vtt" || mime == "text/vtt" -> MimeTypes.TEXT_VTT
+                else -> null
+            }
+            if (subtitleMime == null) {
+                subtitleMessage = "Please select an .srt or .vtt subtitle file."
+            } else {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
+                    .setMimeType(subtitleMime)
+                    .setLanguage("und")
+                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                    .build()
+                val position = player.currentPosition
+                val wasPlaying = player.playWhenReady
+                player.setMediaItem(media.toMediaItem().buildUpon().setSubtitleConfigurations(listOf(subtitle)).build(), position)
+                player.prepare()
+                player.playWhenReady = wasPlaying
+                subtitleMessage = "External subtitle added."
+            }
+        }
+    }
     androidx.compose.runtime.DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onTracksChanged(tracks: Tracks) { availableTracks = tracks }
@@ -612,6 +643,13 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_AUDIO }, modifier = Modifier.weight(1f)) { Text("Audio track") }
             OutlinedButton(onClick = { trackPickerType = C.TRACK_TYPE_TEXT }, modifier = Modifier.weight(1f)) { Text("Subtitles") }
+        }
+        OutlinedButton(
+            onClick = { externalSubtitlePicker.launch(arrayOf("*/*")) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) { Text("Load external subtitle (.SRT / .VTT)") }
+        subtitleMessage?.let { message ->
+            Text(message, color = if (message.startsWith("External")) Accent else Muted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         }
     }
     trackPickerType?.let { type ->
