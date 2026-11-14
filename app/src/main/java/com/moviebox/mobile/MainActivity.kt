@@ -50,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,6 +82,7 @@ import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import androidx.media3.ui.CaptionStyleCompat
 import com.moviebox.mobile.data.CatalogStore
+import com.moviebox.mobile.data.AppPreferencesStore
 import com.moviebox.mobile.data.ParentalControlStore
 import com.moviebox.mobile.data.CatalogTitle
 import com.moviebox.mobile.data.ContentCategory
@@ -122,6 +124,9 @@ private fun MovieBoxApp() {
     val history = remember { WatchHistoryStore(context) }
     val playbackProgress = remember { PlaybackProgressStore(context) }
     val parentalControls = remember { ParentalControlStore(context) }
+    val appPreferences = remember { AppPreferencesStore(context) }
+    var resumePlaybackEnabled by remember { mutableStateOf(appPreferences.resumePlayback()) }
+    var showRecentlyWatched by remember { mutableStateOf(appPreferences.showRecentlyWatched()) }
     var parentalPinEnabled by remember { mutableStateOf(parentalControls.isEnabled()) }
     var pinDialogMode by remember { mutableStateOf<PinDialogMode?>(null) }
     var pinTargetTab by remember { mutableStateOf<AppTab?>(null) }
@@ -168,7 +173,7 @@ private fun MovieBoxApp() {
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = Black) {
             if (playerMedia != null) {
-                MoviePlayer(playerMedia!!, progressStore = playbackProgress, onClose = { playerMedia = null })
+                MoviePlayer(playerMedia!!, progressStore = playbackProgress, resumeEnabled = resumePlaybackEnabled, onClose = { playerMedia = null })
             } else {
                 Scaffold(
                     containerColor = Black,
@@ -218,6 +223,7 @@ private fun MovieBoxApp() {
                                 AppTab.HOME -> HomeScreen(
                                     titles = titles,
                                     recent = recent,
+                                    showRecentlyWatched = showRecentlyWatched,
                                     onAdd = { editingTitle = null; showEditor = true },
                                     onSelect = { selectedTitle = it },
                                     onCategory = { category = it; tab = AppTab.SEARCH },
@@ -258,6 +264,16 @@ private fun MovieBoxApp() {
                                         pinInput = ""
                                         pinError = null
                                         pinDialogMode = PinDialogMode.VERIFY_FOR_DISABLE
+                                    },
+                                    resumePlayback = resumePlaybackEnabled,
+                                    showRecentlyWatched = showRecentlyWatched,
+                                    onResumePlaybackChange = { enabled ->
+                                        resumePlaybackEnabled = enabled
+                                        appPreferences.setResumePlayback(enabled)
+                                    },
+                                    onRecentlyWatchedChange = { enabled ->
+                                        showRecentlyWatched = enabled
+                                        appPreferences.setShowRecentlyWatched(enabled)
                                     }
                                 )
                             }
@@ -403,6 +419,7 @@ private fun MovieBoxApp() {
 private fun HomeScreen(
     titles: List<CatalogTitle>,
     recent: List<RecentTitle>,
+    showRecentlyWatched: Boolean,
     onAdd: () -> Unit,
     onSelect: (CatalogTitle) -> Unit,
     onCategory: (ContentCategory) -> Unit,
@@ -427,7 +444,7 @@ private fun HomeScreen(
                 }
             }
         }
-        if (recent.isNotEmpty()) {
+        if (showRecentlyWatched && recent.isNotEmpty()) {
             item { Text("Recently watched", color = White, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
             items(recent.take(5), key = { "recent-${it.title.id}" }) { TitleCard(it.title, onSelect) }
         }
@@ -639,7 +656,11 @@ private fun SettingsScreen(
     onAdd: () -> Unit,
     pinEnabled: Boolean,
     onSetOrChangePin: () -> Unit,
-    onDisablePin: () -> Unit
+    onDisablePin: () -> Unit,
+    resumePlayback: Boolean,
+    showRecentlyWatched: Boolean,
+    onResumePlaybackChange: (Boolean) -> Unit,
+    onRecentlyWatchedChange: (Boolean) -> Unit
 ) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Settings", color = White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
@@ -648,6 +669,25 @@ private fun SettingsScreen(
                 Text("MovieBox", color = White, fontWeight = FontWeight.Bold)
                 Text("AMOLED dark • Android phone • On-demand movies, anime and web series", color = Muted, fontSize = 12.sp)
                 Text("Hindi-dubbed titles are prioritized. The catalogue is stored on this device.", color = Muted, fontSize = 12.sp)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("App Preferences", color = White, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Resume playback", color = White, fontSize = 14.sp)
+                        Text("Continue videos from the last saved position.", color = Muted, fontSize = 11.sp)
+                    }
+                    Switch(checked = resumePlayback, onCheckedChange = onResumePlaybackChange)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Recently watched row", color = White, fontSize = 14.sp)
+                        Text("Show your recent titles on the Home screen.", color = Muted, fontSize = 11.sp)
+                    }
+                    Switch(checked = showRecentlyWatched, onCheckedChange = onRecentlyWatchedChange)
+                }
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -721,12 +761,12 @@ private fun EmptyState(title: String, description: String) {
 }
 
 @Composable
-private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, onClose: () -> Unit) {
+private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, resumeEnabled: Boolean, onClose: () -> Unit) {
     val context = LocalContext.current
     val player = remember(media.id, media.uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(media.toMediaItem())
-            val resumeAt = progressStore.positionMs(media.id)
+            val resumeAt = if (resumeEnabled) progressStore.positionMs(media.id) else 0L
             if (resumeAt > 0L) seekTo(resumeAt)
             prepare()
             playWhenReady = true
@@ -789,10 +829,11 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
-    LaunchedEffect(player, media.id) {
+    LaunchedEffect(player, media.id, resumeEnabled) {
+        if (!resumeEnabled) progressStore.clear(media.id)
         while (true) {
             delay(5_000)
-            if (player.isPlaying && player.currentPosition > 0L) {
+            if (resumeEnabled && player.isPlaying && player.currentPosition > 0L) {
                 progressStore.save(media.id, player.currentPosition)
             }
             if (player.playbackState == Player.STATE_ENDED) {
@@ -801,9 +842,9 @@ private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, o
             }
         }
     }
-    androidx.compose.runtime.DisposableEffect(player, media.id) {
+    androidx.compose.runtime.DisposableEffect(player, media.id, resumeEnabled) {
         onDispose {
-            if (player.currentPosition > 0L && player.playbackState != Player.STATE_ENDED) {
+            if (resumeEnabled && player.currentPosition > 0L && player.playbackState != Player.STATE_ENDED) {
                 progressStore.save(media.id, player.currentPosition)
             }
             player.release()
