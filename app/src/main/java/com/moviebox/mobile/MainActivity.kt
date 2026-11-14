@@ -116,6 +116,7 @@ private fun MovieBoxApp() {
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<ContentCategory?>(null) }
     var selectedTitle by remember { mutableStateOf<CatalogTitle?>(null) }
+    var managingEpisodesFor by remember { mutableStateOf<CatalogTitle?>(null) }
     var editingTitle by remember { mutableStateOf<CatalogTitle?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var playerMedia by remember { mutableStateOf<VodMedia?>(null) }
@@ -268,11 +269,26 @@ private fun MovieBoxApp() {
                 selectedTitle = catalog.all().firstOrNull { it.id == item.id }
             },
             onEdit = { editingTitle = item; selectedTitle = null; showEditor = true },
+            onManageEpisodes = { managingEpisodesFor = item; selectedTitle = null },
             onDelete = {
                 catalog.delete(item.id)
                 reload()
                 selectedTitle = null
                 notice = "Title removed from your library."
+            }
+        )
+    }
+
+    managingEpisodesFor?.let { series ->
+        EpisodeManagementDialog(
+            series = series,
+            onDismiss = { managingEpisodesFor = null },
+            onPlay = { episode ->
+                val uri = Uri.parse(episode.playbackUrl)
+                if (uri.scheme == "https" && !uri.host.isNullOrBlank()) {
+                    playerMedia = VodMedia(episode.id, "${series.title} • ${episode.title}", uri, PlaybackSourceType.ONLINE_VOD)
+                    managingEpisodesFor = null
+                } else notice = "Is episode ka authorized HTTPS playback link add nahi hai."
             }
         )
     }
@@ -394,6 +410,7 @@ private fun TitleDetailsDialog(
     onDownload: () -> Unit,
     onWatchlist: () -> Unit,
     onEdit: () -> Unit,
+    onManageEpisodes: () -> Unit,
     onDelete: () -> Unit
 ) {
     AlertDialog(
@@ -413,6 +430,7 @@ private fun TitleDetailsDialog(
                 Button(onClick = onPlay, enabled = item.playbackUrl.isNotBlank()) { Text("Play online") }
                 TextButton(onClick = onDownload, enabled = item.downloadUrl.isNotBlank()) { Text("Download offline") }
                 TextButton(onClick = onWatchlist) { Text(if (item.isWatchlisted) "Remove from saved" else "Add to watchlist") }
+                if (item.category != ContentCategory.MOVIE) TextButton(onClick = onManageEpisodes) { Text("Manage seasons & episodes") }
                 TextButton(onClick = onEdit) { Text("Edit title") }
                 TextButton(onClick = onDelete) { Text("Remove title") }
             }
