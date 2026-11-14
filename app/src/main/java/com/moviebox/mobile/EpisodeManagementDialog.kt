@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +20,7 @@ import com.moviebox.mobile.data.EpisodeStore
 import java.util.UUID
 
 @Composable
-internal fun EpisodeManagementDialog(series: CatalogTitle, onDismiss: () -> Unit, onPlay: (CatalogEpisode) -> Unit) {
+internal fun EpisodeManagementDialog(series: CatalogTitle, onDismiss: () -> Unit, onPlay: (CatalogEpisode) -> Unit, onDownload: (CatalogEpisode) -> Unit) {
     val context = LocalContext.current
     val store = remember(series.id) { EpisodeStore(context) }
     var episodes by remember(series.id) { mutableStateOf(store.all(series.id)) }
@@ -29,6 +31,7 @@ internal fun EpisodeManagementDialog(series: CatalogTitle, onDismiss: () -> Unit
     var playback by remember { mutableStateOf("") }
     var download by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val accent = Color(0xFF9B72FF)
     val white = Color(0xFFF7F5FA)
@@ -54,15 +57,16 @@ internal fun EpisodeManagementDialog(series: CatalogTitle, onDismiss: () -> Unit
                     val s = season.toIntOrNull(); val n = number.toIntOrNull()
                     when {
                         s == null || s < 1 || n == null || n < 1 -> error = "Season aur episode number 1 ya usse zyada hona chahiye."
+                        episodes.any { it.id != editingId && it.seasonNumber == s && it.episodeNumber == n } -> error = "Is season mein ye episode number pehle se maujood hai."
                         title.isBlank() -> error = "Episode ka naam likho."
                         playback.isNotBlank() && !playback.startsWith("https://") -> error = "Playback URL HTTPS hona chahiye."
                         download.isNotBlank() && !download.startsWith("https://") -> error = "Download URL HTTPS hona chahiye."
                         else -> {
-                            store.save(series.id, CatalogEpisode(UUID.randomUUID().toString(), s, n, title.trim(), synopsis.trim(), playback.trim(), download.trim(), duration.toIntOrNull() ?: 0))
-                            title = ""; synopsis = ""; playback = ""; download = ""; duration = ""; error = null; reload()
+                            store.save(series.id, CatalogEpisode(editingId ?: UUID.randomUUID().toString(), s, n, title.trim(), synopsis.trim(), playback.trim(), download.trim(), duration.toIntOrNull() ?: 0))
+                            editingId = null; title = ""; synopsis = ""; playback = ""; download = ""; duration = ""; error = null; reload()
                         }
                     }
-                }, Modifier.fillMaxWidth()) { Text("Save episode") } }
+                }, Modifier.fillMaxWidth()) { Text(if (editingId == null) "Save episode" else "Update episode") } }
                 error?.let { message -> item { Text(message, color = Color(0xFFFF7777)) } }
                 val groups = episodes.groupBy { it.seasonNumber }.toSortedMap()
                 if (groups.isEmpty()) item { Text("Abhi koi episode add nahi hua.", color = muted) }
@@ -81,7 +85,19 @@ internal fun EpisodeManagementDialog(series: CatalogTitle, onDismiss: () -> Unit
                                     Text(if (episode.playbackUrl.isBlank()) "Playback link missing" else "Online playback ready", color = accent)
                                 }
                                 Column {
+                                    IconButton(onClick = {
+                                        editingId = episode.id
+                                        season = episode.seasonNumber.toString()
+                                        number = episode.episodeNumber.toString()
+                                        title = episode.title
+                                        synopsis = episode.synopsis
+                                        playback = episode.playbackUrl
+                                        download = episode.downloadUrl
+                                        duration = if (episode.durationMinutes > 0) episode.durationMinutes.toString() else ""
+                                        error = null
+                                    }) { Icon(Icons.Default.Edit, "Edit episode", tint = muted) }
                                     IconButton(onClick = { onPlay(episode) }, enabled = episode.playbackUrl.isNotBlank()) { Icon(Icons.Default.PlayArrow, "Play episode", tint = accent) }
+                                    IconButton(onClick = { onDownload(episode) }, enabled = episode.downloadUrl.isNotBlank()) { Icon(Icons.Default.Download, "Download episode", tint = accent) }
                                     IconButton(onClick = { store.delete(series.id, episode.id); reload() }) { Icon(Icons.Default.Delete, "Delete episode", tint = muted) }
                                 }
                             }
