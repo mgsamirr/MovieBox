@@ -50,7 +50,7 @@ fun AuthorizedPlaybackScreen(
     }
     val result = remember(config) { AuthorizedDrmMediaItemFactory.create(config) }
     var playbackError by remember(config) { mutableStateOf<String?>(null) }
-    var resumeApplied by remember(config.title.id) { mutableStateOf(false) }
+    var resumeApplied by remember(config) { mutableStateOf(false) }
     val currentOnProgress by rememberUpdatedState(onProgress)
     val currentOnCompleted by rememberUpdatedState(onCompleted)
 
