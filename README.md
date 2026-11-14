@@ -18,6 +18,8 @@ MovieBox is a native, touch-first Android phone app for on-demand movies, anime,
 - Saved watchlist and recently watched history.
 - Editable catalogue entries with provider-authorized HTTPS playback/download links.
 - Season and episode management for web series and anime, with season grouping, episode numbering, descriptions, duration metadata, and per-episode authorized HTTPS playback/download links.
+- Edit existing episodes, prevent duplicate episode numbers within a season, and delete individual episodes or complete seasons.
+- Episode downloads use the shared Android offline download queue; episode playback progress resumes independently by episode ID.
 - Episode catalogue is stored locally per series; episodes can be played in the built-in Media3 VOD player.
 - Download queue with Android DownloadManager status and progress.
 - Local video picker and offline playback through Media3.
