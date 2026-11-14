@@ -76,6 +76,7 @@ import com.moviebox.mobile.data.ContentCategory
 import com.moviebox.mobile.data.DownloadRepository
 import com.moviebox.mobile.data.DownloadStatus
 import com.moviebox.mobile.data.PlaybackSourceType
+import com.moviebox.mobile.data.PlaybackProgressStore
 import com.moviebox.mobile.data.SavedDownload
 import com.moviebox.mobile.data.VodMedia
 import com.moviebox.mobile.data.WatchHistoryStore
@@ -106,6 +107,7 @@ private fun MovieBoxApp() {
     val catalog = remember { CatalogStore(context) }
     val downloads = remember { DownloadRepository(context) }
     val history = remember { WatchHistoryStore(context) }
+    val playbackProgress = remember { PlaybackProgressStore(context) }
     var tab by remember { mutableStateOf(AppTab.HOME) }
     var titles by remember { mutableStateOf(catalog.all()) }
     var queue by remember { mutableStateOf(downloads.all()) }
@@ -146,7 +148,7 @@ private fun MovieBoxApp() {
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = Black) {
             if (playerMedia != null) {
-                MoviePlayer(playerMedia!!, onClose = { playerMedia = null })
+                MoviePlayer(playerMedia!!, progressStore = playbackProgress, onClose = { playerMedia = null })
             } else {
                 Scaffold(
                     containerColor = Black,
@@ -537,16 +539,37 @@ private fun EmptyState(title: String, description: String) {
 }
 
 @Composable
-private fun MoviePlayer(media: VodMedia, onClose: () -> Unit) {
+private fun MoviePlayer(media: VodMedia, progressStore: PlaybackProgressStore, onClose: () -> Unit) {
     val context = LocalContext.current
     val player = remember(media.id, media.uri) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(media.toMediaItem())
+            val resumeAt = progressStore.positionMs(media.id)
+            if (resumeAt > 0L) seekTo(resumeAt)
             prepare()
             playWhenReady = true
         }
     }
-    androidx.compose.runtime.DisposableEffect(player) { onDispose { player.release() } }
+    LaunchedEffect(player, media.id) {
+        while (true) {
+            delay(5_000)
+            if (player.isPlaying && player.currentPosition > 0L) {
+                progressStore.save(media.id, player.currentPosition)
+            }
+            if (player.playbackState == androidx.media3.common.Player.STATE_ENDED) {
+                progressStore.clear(media.id)
+                break
+            }
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(player, media.id) {
+        onDispose {
+            if (player.currentPosition > 0L && player.playbackState != androidx.media3.common.Player.STATE_ENDED) {
+                progressStore.save(media.id, player.currentPosition)
+            }
+            player.release()
+        }
+    }
     Column(Modifier.fillMaxSize().background(Black)) {
         Text("←  Back to MovieBox", color = White, modifier = Modifier.clickable(onClick = onClose).padding(16.dp))
         AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().weight(1f))
