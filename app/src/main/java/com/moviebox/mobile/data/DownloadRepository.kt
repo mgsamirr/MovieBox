@@ -56,6 +56,8 @@ class DownloadRepository(private val context: Context) {
         }
     }
 
+    fun downloadedUri(id: Long): Uri? = manager.getUriForDownloadedFile(id)
+
     fun remove(id: Long) {
         manager.remove(id)
         save(all().filterNot { it.id == id })
