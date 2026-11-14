@@ -15,7 +15,7 @@ class ContinueWatchingStoreTest {
 
     @Before
     fun setUp() {
-        val application = RuntimeEnvironment.getApplication<android.app.Application>()
+        val application = RuntimeEnvironment.getApplication()
         preferences = application.getSharedPreferences("movie_box_resume_test", 0)
         preferences.edit().clear().commit()
         store = ContinueWatchingStore(preferences)
@@ -87,7 +87,7 @@ class ContinueWatchingStoreTest {
 
     @Test
     fun resumeHistoryDoesNotWriteIntoWatchlistBackupPreferences() {
-        val application = RuntimeEnvironment.getApplication<android.app.Application>()
+        val application = RuntimeEnvironment.getApplication()
         store.record(ResumePoint("movie-1", 5L, 10L, 1L))
 
         assertEquals(null, application.getSharedPreferences("movie_box", 0).getString("resume_points_json", null))
